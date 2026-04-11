@@ -52,7 +52,6 @@ export const translations = {
     wordIn: (lang: string) => `Word in ${lang}`,
     add: 'Add',
     importExcel: 'Import Excel',
-    importing: 'Importing...',
     importResult: (count: number, skipped: number) =>
       skipped > 0
         ? `Imported ${count} pairs, ${skipped} skipped (duplicates)`
@@ -61,11 +60,6 @@ export const translations = {
     // Export modal
     exportModalTitle: 'Export Word Pairs',
     exportScope: 'Export scope',
-    exportCurrentLevel: 'Current section only',
-    exportSpecificSections: 'Specific subsections',
-    exportAllLevels: 'All sections in language',
-    exportSelectSections: 'Select subsections to export',
-    exportIncludeUnsectioned: 'No-subsection pairs',
     exportSearchPlaceholder: 'Search pairs...',
     exportSelectAll: 'Select all',
     exportDeselectAll: 'Deselect all',
@@ -222,7 +216,6 @@ export const translations = {
     wordIn: (lang: string) => `${lang} dilinde kelime`,
     add: 'Ekle',
     importExcel: 'Excel İçe Aktar',
-    importing: 'İçe aktarılıyor...',
     importResult: (count: number, skipped: number) =>
       skipped > 0
         ? `${count} çift içe aktarıldı, ${skipped} atlandı (tekrar)`
@@ -231,11 +224,6 @@ export const translations = {
     // Export modal
     exportModalTitle: 'Kelime Çiftlerini Dışa Aktar',
     exportScope: 'Dışa aktarma kapsamı',
-    exportCurrentLevel: 'Yalnızca mevcut bölüm',
-    exportSpecificSections: 'Belirli alt bölümler',
-    exportAllLevels: 'Dildeki tüm bölümler',
-    exportSelectSections: 'Dışa aktarılacak alt bölümleri seçin',
-    exportIncludeUnsectioned: 'Alt bölümsüz çiftler',
     exportSearchPlaceholder: 'Çift ara...',
     exportSelectAll: 'Tümünü seç',
     exportDeselectAll: 'Seçimi kaldır',

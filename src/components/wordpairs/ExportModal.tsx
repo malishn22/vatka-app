@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Modal } from '../shared/Modal';
 import { Button } from '../shared/Button';
 import type { WordPair, Section, Level, Language } from '../../types';

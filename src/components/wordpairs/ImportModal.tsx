@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Modal } from '../shared/Modal';
 import { Button } from '../shared/Button';
 import type { Section, Language, Level } from '../../types';
