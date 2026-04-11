@@ -4,7 +4,7 @@ import { Button } from '../shared/Button';
 import { Input } from '../shared/Input';
 import { useT } from '../../i18n/useT';
 import { usePairedPaste } from '../../hooks/usePairedPaste';
-import { useExcelImport } from '../../hooks/useExcelImport';
+import { ImportModal } from './ImportModal';
 
 interface AddWordPairFormProps {
   levelId: number;
@@ -14,31 +14,18 @@ interface AddWordPairFormProps {
 }
 
 export function AddWordPairForm({ levelId, sectionId, sourceLabel, targetLabel }: AddWordPairFormProps) {
-  const { addWordPair, levels, wordPairExistsInLanguage } = useDataStore();
+  const { addWordPair, sections, levels, wordPairExistsInLanguage, languages } = useDataStore();
   const t = useT();
   const [source, setSource] = useState('');
   const [target, setTarget] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [importing, setImporting] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const targetRef = useRef<HTMLInputElement>(null);
 
-  const { triggerImport, fileInputProps } = useExcelImport(async (rows) => {
-    const level = levels.find((l) => l.id === levelId);
-    if (!level) return;
-    setImporting(true);
-    setError('');
-    let imported = 0;
-    let skipped = 0;
-    for (const { source, target } of rows) {
-      const exists = await wordPairExistsInLanguage(level.language_id, source, target);
-      if (exists) { skipped++; continue; }
-      await addWordPair({ level_id: levelId, section_id: sectionId, source, target });
-      imported++;
-    }
-    setImporting(false);
-    setMessage(t.importResult(imported, skipped));
-  });
+  const level = levels.find((l) => l.id === levelId);
+  const language = level ? languages.find((l) => l.id === level.language_id) : undefined;
+  const levelSections = sections.filter(s => s.level_id === levelId);
 
   const handlePairedPaste = usePairedPaste((left, right) => {
     setSource(left);
@@ -49,7 +36,6 @@ export function AddWordPairForm({ levelId, sectionId, sourceLabel, targetLabel }
 
   const handleAdd = async () => {
     if (!source.trim() || !target.trim()) { setError(t.bothFieldsRequired); return; }
-    const level = levels.find((l) => l.id === levelId);
     if (level) {
       const exists = await wordPairExistsInLanguage(level.language_id, source.trim(), target.trim());
       if (exists) { setError(t.wordPairAlreadyExists); return; }
@@ -89,13 +75,26 @@ export function AddWordPairForm({ levelId, sectionId, sourceLabel, targetLabel }
           />
         </div>
         <Button onClick={handleAdd} className="mb-0.5">{t.add}</Button>
-        <Button onClick={triggerImport} disabled={importing} className="mb-0.5">
-          {importing ? t.importing : t.importExcel}
+        <Button onClick={() => setImportModalOpen(true)} className="mb-0.5">
+          {t.importExcel}
         </Button>
-        <input {...fileInputProps} />
       </div>
       {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
       {message && <p className="text-xs text-green-600 dark:text-green-400 mt-2">{message}</p>}
+
+      {language && (
+        <ImportModal
+          isOpen={importModalOpen}
+          onClose={() => setImportModalOpen(false)}
+          levelId={levelId}
+          language={language}
+          sections={levelSections}
+          levels={levels.filter(l => l.language_id === language.id)}
+          sourceLabel={sourceLabel}
+          targetLabel={targetLabel}
+          onImported={(count, skipped) => setMessage(t.importResult(count, skipped))}
+        />
+      )}
     </div>
   );
 }

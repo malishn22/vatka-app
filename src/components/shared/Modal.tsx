@@ -7,9 +7,10 @@ interface ModalProps {
   title: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  size?: 'md' | 'lg';
 }
 
-export function Modal({ isOpen, onClose, title, children, footer }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, footer, size = 'md' }: ModalProps) {
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -25,7 +26,7 @@ export function Modal({ isOpen, onClose, title, children, footer }: ModalProps) 
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md mx-4 p-6 flex flex-col gap-4"
+        className={`bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full ${size === 'lg' ? 'max-w-2xl' : 'max-w-md'} mx-4 p-6 flex flex-col gap-4`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">

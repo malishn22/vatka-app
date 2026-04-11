@@ -1,21 +1,28 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useUIStore } from '../../store/uiStore';
 import { useDataStore } from '../../store/dataStore';
 import { usePlayStore } from '../../store/playStore';
 import { WordPairRow } from './WordPairRow';
 import { AddWordPairForm } from './AddWordPairForm';
 import { Button } from '../shared/Button';
+import { Toast } from '../shared/Toast';
 import { useT } from '../../i18n/useT';
+import { ExportModal } from './ExportModal';
 
 export function WordPairsView() {
   const { selectedLevelId, selectedSectionId, selectedLanguageId, setView } = useUIStore();
   const { levels, languages, sections, wordPairs, fetchWordPairs } = useDataStore();
   const { initGame } = usePlayStore();
   const t = useT();
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'xlsx' | 'csv' | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const level = levels.find((l) => l.id === selectedLevelId);
   const language = languages.find((l) => l.id === selectedLanguageId);
   const section = sections.find((s) => s.id === selectedSectionId);
+  const levelSections = sections.filter((s) => s.level_id === selectedLevelId);
+  const languageLevels = levels.filter((l) => l.language_id === selectedLanguageId);
 
   useEffect(() => {
     if (selectedLevelId !== null) {
@@ -55,13 +62,44 @@ export function WordPairsView() {
             {displayedPairs.length} {displayedPairs.length !== 1 ? t.wordPairs : t.wordPair}
           </p>
         </div>
-        <Button
-          onClick={handlePlay}
-          disabled={activePairs.length < 2}
-          title={activePairs.length < 2 ? t.needAtLeastTwoWordPairs : ''}
-        >
-          {t.play}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={handlePlay}
+            disabled={activePairs.length < 2}
+            title={activePairs.length < 2 ? t.needAtLeastTwoWordPairs : ''}
+          >
+            {t.play}
+          </Button>
+
+          <div className="relative">
+            <Button
+              variant="secondary"
+              onClick={() => setExportOpen((o) => !o)}
+              disabled={wordPairs.length === 0}
+            >
+              {t.export}
+            </Button>
+            {exportOpen && (
+              <div
+                className="absolute right-0 mt-1 w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-10"
+                onMouseLeave={() => setExportOpen(false)}
+              >
+                <button
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  onClick={() => { setExportFormat('xlsx'); setExportOpen(false); }}
+                >
+                  {t.exportExcel}
+                </button>
+                <button
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  onClick={() => { setExportFormat('csv'); setExportOpen(false); }}
+                >
+                  {t.exportCsv}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {displayedPairs.length === 0 ? (
@@ -102,6 +140,22 @@ export function WordPairsView() {
         sourceLabel={language?.source ?? t.source}
         targetLabel={language?.target ?? t.target}
       />
+      {toastMsg && <Toast message={toastMsg} onDone={() => setToastMsg(null)} />}
+
+      {exportFormat !== null && language && (
+        <ExportModal
+          isOpen={exportFormat !== null}
+          onClose={() => setExportFormat(null)}
+          format={exportFormat}
+          language={language}
+          levels={languageLevels}
+          currentLevelId={level.id}
+          sections={levelSections}
+          wordPairs={wordPairs}
+          unsectionedLabel={t.unsectioned}
+          onSuccess={() => setToastMsg(t.exportedSuccessfully)}
+        />
+      )}
     </div>
   );
 }

@@ -12,6 +12,7 @@ interface UIState {
   isDark: boolean;
   lang: Lang;
   favoriteLanguages: string[];
+  pairsPerRound: number;
   setView: (view: View) => void;
   setSelectedLanguage: (id: number | null) => void;
   setSelectedLevel: (id: number | null) => void;
@@ -19,6 +20,7 @@ interface UIState {
   toggleDark: () => void;
   setLang: (lang: Lang) => void;
   toggleFavoriteLanguage: (lang: string) => void;
+  setPairsPerRound: (n: number) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -31,6 +33,7 @@ export const useUIStore = create<UIState>()(
       isDark: true,
       lang: 'en',
       favoriteLanguages: [],
+      pairsPerRound: 5,
       setView: (view) => set({ currentView: view }),
       setSelectedLanguage: (id) => set({ selectedLanguageId: id, selectedLevelId: null, selectedSectionId: null, currentView: id ? 'wordpairs' : 'languages' }),
       setSelectedLevel: (id) => set({ selectedLevelId: id, selectedSectionId: null, currentView: id ? 'wordpairs' : 'languages' }),
@@ -49,10 +52,11 @@ export const useUIStore = create<UIState>()(
           set({ favoriteLanguages: [...favoriteLanguages, lang] });
         }
       },
+      setPairsPerRound: (n) => set({ pairsPerRound: n }),
     }),
     {
       name: 'ui-prefs',
-      partialize: (state) => ({ isDark: state.isDark, lang: state.lang, favoriteLanguages: state.favoriteLanguages }),
+      partialize: (state) => ({ isDark: state.isDark, lang: state.lang, favoriteLanguages: state.favoriteLanguages, pairsPerRound: state.pairsPerRound }),
     }
   )
 );

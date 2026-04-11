@@ -28,6 +28,7 @@ export function PlayHeader({ total, remaining, currentRoundSize, matched, onExit
             style={{ width: `${pct}%` }}
           />
         </div>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 text-right">{currentRoundSize} {t.pairsPerRound}</p>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { fisherYates } from '../utils/shuffle';
 import type { WordPair } from '../types';
+import { useUIStore } from './uiStore';
 
 interface ShuffledTarget {
   id: number;
@@ -64,9 +65,10 @@ export const usePlayStore = create<PlayState>((set, get) => {
     gameComplete: false,
 
     initGame: (pairs) => {
+      const batchSize = useUIStore.getState().pairsPerRound;
       const shuffled = fisherYates([...pairs]);
-      const batch = shuffled.slice(0, 5);
-      const remaining = shuffled.slice(5);
+      const batch = shuffled.slice(0, batchSize);
+      const remaining = shuffled.slice(batchSize);
       set({ allPairs: shuffled, remaining, gameComplete: false, ...makeRound(batch) });
     },
 
@@ -98,8 +100,9 @@ export const usePlayStore = create<PlayState>((set, get) => {
         set({ gameComplete: true, roundComplete: false });
         return;
       }
-      const batch = remaining.slice(0, 5);
-      set({ remaining: remaining.slice(5), ...makeRound(batch) });
+      const batchSize = useUIStore.getState().pairsPerRound;
+      const batch = remaining.slice(0, batchSize);
+      set({ remaining: remaining.slice(batchSize), ...makeRound(batch) });
     },
 
     resetGame: () => set({
