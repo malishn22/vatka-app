@@ -152,7 +152,6 @@ export function WordPairsView() {
           currentLevelId={level.id}
           sections={levelSections}
           wordPairs={wordPairs}
-          unsectionedLabel={t.unsectioned}
           onSuccess={() => setToastMsg(t.exportedSuccessfully)}
         />
       )}

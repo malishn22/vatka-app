@@ -17,7 +17,6 @@ interface ExportModalProps {
   currentLevelId: number;
   sections: Section[];
   wordPairs: WordPair[];
-  unsectionedLabel: string;
   onSuccess: () => void;
 }
 
@@ -30,7 +29,6 @@ export function ExportModal({
   currentLevelId,
   sections,
   wordPairs,
-  unsectionedLabel,
   onSuccess,
 }: ExportModalProps) {
   const t = useT();
@@ -150,7 +148,6 @@ export function ExportModal({
     sections,
     level: currentLevel ?? levels[0],
     language,
-    unsectionedLabel,
     onSuccess: () => {
       onSuccess();
       onClose();

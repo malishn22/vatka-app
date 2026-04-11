@@ -9,7 +9,6 @@ interface UseExcelExportArgs {
   sections: Section[];
   level: Level;
   language: Language;
-  unsectionedLabel: string;
   onSuccess: () => void;
 }
 
@@ -21,7 +20,7 @@ export interface ExportPayload {
 }
 
 export async function fetchWordPairsRaw(levelId: number): Promise<WordPair[]> {
-  const rows = await dbSelect<WordPair & { disabled: number }>(
+  const rows = await dbSelect<Omit<WordPair, 'disabled'> & { disabled: number }>(
     'SELECT * FROM word_pairs WHERE level_id = ? ORDER BY id',
     [levelId]
   );
@@ -35,7 +34,7 @@ export async function fetchSectionsRaw(levelId: number): Promise<Section[]> {
   );
 }
 
-export function useExcelExport({ wordPairs, sections, level, language, unsectionedLabel, onSuccess }: UseExcelExportArgs) {
+export function useExcelExport({ wordPairs, sections, level, language, onSuccess }: UseExcelExportArgs) {
   const safeFilename = (label: string, ext: string) => {
     const raw = `${language.name}_${label}`;
     return raw.replace(/[/\\:*?"<>|]/g, '').replace(/\s+/g, '_') + `.${ext}`;
