@@ -17,7 +17,7 @@ interface SectionItemProps {
 
 export function SectionItem({ section, onSectionDrop, currentPairSectionId }: SectionItemProps) {
   const { selectedSectionId, setSelectedLevel, setSelectedSection, setView } = useUIStore();
-  const { deleteSection, updateWordPair } = useDataStore();
+  const { deleteSection, updateWordPair, sections } = useDataStore();
   const { draggingPairId, setDraggingPairId, draggingSectionId, setDraggingSectionId } = useDragContext();
   const t = useT();
   const [showEdit, setShowEdit] = useState(false);
@@ -29,7 +29,8 @@ export function SectionItem({ section, onSectionDrop, currentPairSectionId }: Se
 
   // Can this section accept the current drag?
   const canAcceptPairDrop = draggingPairId !== null && currentPairSectionId !== section.id;
-  const canAcceptSectionDrop = draggingSectionId !== null && draggingSectionId !== section.id;
+  const draggedSection = draggingSectionId !== null ? sections.find(s => s.id === draggingSectionId) : null;
+  const canAcceptSectionDrop = draggedSection != null && draggedSection.id !== section.id;
   const showDashedHint = draggingPairId !== null && currentPairSectionId !== section.id;
 
   const handleSelect = () => {

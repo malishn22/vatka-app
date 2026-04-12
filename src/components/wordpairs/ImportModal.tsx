@@ -59,23 +59,26 @@ export function ImportModal({
 
   const handleParsed = useCallback(async (parsed: ParsedPair[]) => {
     setIsChecking(true);
-    const built: ImportRow[] = [];
-    for (let i = 0; i < parsed.length; i++) {
-      const { source, target, section, subsection } = parsed[i];
-      const isDuplicate = await wordPairExistsInLanguage(language.id, source, target);
-      built.push({
-        id: String(i),
-        source,
-        target,
-        sectionName: section ?? '',
-        subsectionName: subsection ?? '',
-        isDuplicate,
-        disabled: parsed[i].disabled ?? false,
-      });
+    try {
+      const built: ImportRow[] = [];
+      for (let i = 0; i < parsed.length; i++) {
+        const { source, target, section, subsection } = parsed[i];
+        const isDuplicate = await wordPairExistsInLanguage(language.id, source, target);
+        built.push({
+          id: String(i),
+          source,
+          target,
+          sectionName: section ?? '',
+          subsectionName: subsection ?? '',
+          isDuplicate,
+          disabled: parsed[i].disabled ?? false,
+        });
+      }
+      setRows(built);
+      setStep('preview');
+    } finally {
+      setIsChecking(false);
     }
-    setRows(built);
-    setIsChecking(false);
-    setStep('preview');
   }, [language.id, wordPairExistsInLanguage]);
 
   const { triggerImport, fileInputProps } = useExcelImport(handleParsed, {
@@ -100,102 +103,104 @@ export function ImportModal({
     let imported = 0;
     let skipped = 0;
 
-    // Per-level subsection caches: levelId → Map<subsectionNameLower, subsectionId>
-    const subsectionCaches = new Map<number, Map<string, number>>();
+    try {
+      // Per-level subsection caches: levelId → Map<subsectionNameLower, subsectionId>
+      const subsectionCaches = new Map<number, Map<string, number>>();
 
-    // Pre-populate current level's subsections (only if a real level is selected)
-    if (levelId > 0) {
-      subsectionCaches.set(
-        levelId,
-        new Map(sections.map(s => [s.name.toLowerCase(), s.id]))
+      // Pre-populate current level's subsections (only if a real level is selected)
+      if (levelId > 0) {
+        subsectionCaches.set(
+          levelId,
+          new Map(sections.map(s => [s.name.toLowerCase(), s.id]))
+        );
+      }
+
+      // Cache for auto-created levels: levelNameLower → levelId
+      const levelCache = new Map<string, number>(
+        levels.map(l => [l.name.toLowerCase(), l.id])
       );
-    }
+      let defaultLevelId: number | null = null;
 
-    // Cache for auto-created levels: levelNameLower → levelId
-    const levelCache = new Map<string, number>(
-      levels.map(l => [l.name.toLowerCase(), l.id])
-    );
-    let defaultLevelId: number | null = null;
+      const writtenLevelIds = new Set<number>();
 
-    const writtenLevelIds = new Set<number>();
+      for (const row of rows) {
+        if (row.isDuplicate) { skipped++; continue; }
 
-    for (const row of rows) {
-      if (row.isDuplicate) { skipped++; continue; }
-
-      // Resolve target level from section name
-      let targetLevelId = levelId;
-      if (row.sectionName.trim()) {
-        const key = row.sectionName.trim().toLowerCase();
-        if (levelCache.has(key)) {
-          targetLevelId = levelCache.get(key)!;
-        } else {
-          // Auto-create the level
-          await addLevel({ language_id: language.id, section_id: null, name: row.sectionName.trim(), position: 0 });
-          const newLevel = useDataStore.getState().levels.find(
-            l => l.language_id === language.id && l.name.toLowerCase() === key
-          );
-          if (newLevel) {
-            levelCache.set(key, newLevel.id);
-            targetLevelId = newLevel.id;
-          }
-        }
-      } else if (levelId === 0) {
-        // No section name and no selected level — create a default level once
-        if (defaultLevelId === null) {
-          const defaultName = language.name;
-          const existingDefault = useDataStore.getState().levels.find(
-            l => l.language_id === language.id && l.name.toLowerCase() === defaultName.toLowerCase()
-          );
-          if (existingDefault) {
-            defaultLevelId = existingDefault.id;
+        // Resolve target level from section name
+        let targetLevelId = levelId;
+        if (row.sectionName.trim()) {
+          const key = row.sectionName.trim().toLowerCase();
+          if (levelCache.has(key)) {
+            targetLevelId = levelCache.get(key)!;
           } else {
-            await addLevel({ language_id: language.id, section_id: null, name: defaultName, position: 0 });
-            const created = useDataStore.getState().levels.find(
+            // Auto-create the level
+            await addLevel({ language_id: language.id, section_id: null, name: row.sectionName.trim(), position: 0 });
+            const newLevel = useDataStore.getState().levels.find(
+              l => l.language_id === language.id && l.name.toLowerCase() === key
+            );
+            if (newLevel) {
+              levelCache.set(key, newLevel.id);
+              targetLevelId = newLevel.id;
+            }
+          }
+        } else if (levelId === 0) {
+          // No section name and no selected level — create a default level once
+          if (defaultLevelId === null) {
+            const defaultName = language.name;
+            const existingDefault = useDataStore.getState().levels.find(
               l => l.language_id === language.id && l.name.toLowerCase() === defaultName.toLowerCase()
             );
-            defaultLevelId = created?.id ?? 0;
+            if (existingDefault) {
+              defaultLevelId = existingDefault.id;
+            } else {
+              await addLevel({ language_id: language.id, section_id: null, name: defaultName, position: 0 });
+              const created = useDataStore.getState().levels.find(
+                l => l.language_id === language.id && l.name.toLowerCase() === defaultName.toLowerCase()
+              );
+              defaultLevelId = created?.id ?? 0;
+            }
+          }
+          targetLevelId = defaultLevelId!;
+        }
+
+        // Ensure subsection cache exists for target level
+        if (!subsectionCaches.has(targetLevelId)) {
+          subsectionCaches.set(targetLevelId, new Map());
+        }
+        const subsectionCache = subsectionCaches.get(targetLevelId)!;
+
+        // Resolve subsection
+        let resolvedSubsectionId: number | null = null;
+        if (row.subsectionName.trim()) {
+          const key = row.subsectionName.trim().toLowerCase();
+          if (subsectionCache.has(key)) {
+            resolvedSubsectionId = subsectionCache.get(key)!;
+          } else {
+            await addSection({ level_id: targetLevelId, name: row.subsectionName.trim(), position: 0 });
+            const newSection = useDataStore.getState().sections.find(
+              s => s.level_id === targetLevelId && s.name.toLowerCase() === key
+            );
+            if (newSection) {
+              subsectionCache.set(key, newSection.id);
+              resolvedSubsectionId = newSection.id;
+            }
           }
         }
-        targetLevelId = defaultLevelId!;
+
+        await addWordPair({ level_id: targetLevelId, section_id: resolvedSubsectionId, source: row.source, target: row.target, disabled: row.disabled });
+        writtenLevelIds.add(targetLevelId);
+        imported++;
       }
 
-      // Ensure subsection cache exists for target level
-      if (!subsectionCaches.has(targetLevelId)) {
-        subsectionCaches.set(targetLevelId, new Map());
+      // Refresh word pairs for every level we wrote to
+      for (const lvlId of writtenLevelIds) {
+        await fetchWordPairs(lvlId);
       }
-      const subsectionCache = subsectionCaches.get(targetLevelId)!;
-
-      // Resolve subsection
-      let resolvedSubsectionId: number | null = null;
-      if (row.subsectionName.trim()) {
-        const key = row.subsectionName.trim().toLowerCase();
-        if (subsectionCache.has(key)) {
-          resolvedSubsectionId = subsectionCache.get(key)!;
-        } else {
-          await addSection({ level_id: targetLevelId, name: row.subsectionName.trim(), position: 0 });
-          const newSection = useDataStore.getState().sections.find(
-            s => s.level_id === targetLevelId && s.name.toLowerCase() === key
-          );
-          if (newSection) {
-            subsectionCache.set(key, newSection.id);
-            resolvedSubsectionId = newSection.id;
-          }
-        }
-      }
-
-      await addWordPair({ level_id: targetLevelId, section_id: resolvedSubsectionId, source: row.source, target: row.target, disabled: row.disabled });
-      writtenLevelIds.add(targetLevelId);
-      imported++;
+    } finally {
+      setIsImporting(false);
+      onImported(imported, skipped);
+      onClose();
     }
-
-    // Refresh word pairs for every level we wrote to
-    for (const lvlId of writtenLevelIds) {
-      await fetchWordPairs(lvlId);
-    }
-
-    setIsImporting(false);
-    onImported(imported, skipped);
-    onClose();
   };
 
   const toImportCount = rows.filter(r => !r.isDuplicate).length;

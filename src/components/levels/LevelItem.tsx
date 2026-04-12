@@ -17,7 +17,7 @@ interface LevelItemProps {
 }
 
 export function LevelItem({ level, onLevelDrop }: LevelItemProps) {
-  const { selectedLevelId, setSelectedLevel, setView } = useUIStore();
+  const { selectedLevelId, setSelectedLevel, setSelectedSection, setView } = useUIStore();
   const { deleteLevel, fetchSections, sections, wordPairs, updateWordPair, reorderSections, moveSection } = useDataStore();
   const { draggingPairId, setDraggingPairId, draggingSectionId, setDraggingSectionId, draggingLevelId, setDraggingLevelId } = useDragContext();
   const t = useT();
@@ -130,8 +130,11 @@ export function LevelItem({ level, onLevelDrop }: LevelItemProps) {
               return;
             }
             if (draggingSectionId !== null && !sectionBelongsToThisLevel) {
-              await moveSection(draggingSectionId, level.id);
+              const movedSectionId = draggingSectionId;
+              await moveSection(movedSectionId, level.id);
               setDraggingSectionId(null);
+              setSelectedLevel(level.id);
+              setSelectedSection(movedSectionId);
               return;
             }
             if (draggingPairId !== null) {

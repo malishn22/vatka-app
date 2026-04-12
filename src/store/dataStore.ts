@@ -126,15 +126,8 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   reorderSections: async (levelId, orderedIds) => {
-    try {
-      await dbExecute('BEGIN');
-      for (let i = 0; i < orderedIds.length; i++) {
-        await dbExecute('UPDATE sections SET position = ? WHERE id = ?', [i, orderedIds[i]]);
-      }
-      await dbExecute('COMMIT');
-    } catch (e) {
-      await dbExecute('ROLLBACK');
-      throw e;
+    for (let i = 0; i < orderedIds.length; i++) {
+      await dbExecute('UPDATE sections SET position = ? WHERE id = ?', [i, orderedIds[i]]);
     }
     await get().fetchSections(levelId);
   },
@@ -143,10 +136,15 @@ export const useDataStore = create<DataState>((set, get) => ({
     const section = get().sections.find((s) => s.id === id);
     if (!section) return;
     const oldLevelId = section.level_id;
-    const newPosition = get().sections.filter((s) => s.level_id === newLevelId).length;
-    await dbExecute('UPDATE sections SET level_id = ?, position = ? WHERE id = ?', [newLevelId, newPosition, id]);
+    const [{ newPos }] = await dbSelect<{ newPos: number }>(
+      'SELECT COALESCE(MAX(position), -1) + 1 AS newPos FROM sections WHERE level_id = ?',
+      [newLevelId]
+    );
+    await dbExecute('UPDATE sections SET level_id = ?, position = ? WHERE id = ?', [newLevelId, newPos, id]);
+    await dbExecute('UPDATE word_pairs SET level_id = ? WHERE section_id = ?', [newLevelId, id]);
     await get().fetchSections(oldLevelId);
     await get().fetchSections(newLevelId);
+    await get().fetchWordPairs(newLevelId);
   },
 
   deleteSection: async (id) => {
@@ -203,15 +201,8 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   reorderLevels: async (languageId, orderedIds) => {
-    try {
-      await dbExecute('BEGIN');
-      for (let i = 0; i < orderedIds.length; i++) {
-        await dbExecute('UPDATE levels SET position = ? WHERE id = ?', [i, orderedIds[i]]);
-      }
-      await dbExecute('COMMIT');
-    } catch (e) {
-      await dbExecute('ROLLBACK');
-      throw e;
+    for (let i = 0; i < orderedIds.length; i++) {
+      await dbExecute('UPDATE levels SET position = ? WHERE id = ?', [i, orderedIds[i]]);
     }
     await get().fetchLevels(languageId);
   },
