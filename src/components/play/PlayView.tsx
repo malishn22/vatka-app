@@ -4,12 +4,12 @@ import { useDataStore } from '../../store/dataStore';
 import { usePlayStore } from '../../store/playStore';
 import { PlayHeader } from './PlayHeader';
 import { WordCard } from './WordCard';
-import { SuccessOverlay } from './SuccessOverlay';
 import { CompletionScreen } from './CompletionScreen';
+import { QuizView } from './QuizView';
 import { useT } from '../../i18n/useT';
 
 export function PlayView() {
-  const { setView } = useUIStore();
+  const { setView, gameMode } = useUIStore();
   const { wordPairs } = useDataStore();
   const {
     allPairs, remaining, currentRound, shuffledTargets, matched,
@@ -20,6 +20,7 @@ export function PlayView() {
   const t = useT();
 
   const wrongTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const roundTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clear wrong flash after 600ms
   useEffect(() => {
@@ -30,6 +31,20 @@ export function PlayView() {
       if (wrongTimerRef.current) clearTimeout(wrongTimerRef.current);
     };
   }, [wrongPair]);
+
+  // Auto-advance to next round after 1s
+  useEffect(() => {
+    if (roundComplete) {
+      roundTimerRef.current = setTimeout(() => nextRound(), 1000);
+    }
+    return () => {
+      if (roundTimerRef.current) clearTimeout(roundTimerRef.current);
+    };
+  }, [roundComplete]);
+
+  if (gameMode === 'quiz') {
+    return <QuizView />;
+  }
 
   const handlePlayAgain = () => {
     initGame(wordPairs);
@@ -85,18 +100,6 @@ export function PlayView() {
         </div>
       </div>
 
-      {roundComplete && (
-        <SuccessOverlay
-          onNext={() => {
-            if (remaining.length === 0) {
-              nextRound();
-            } else {
-              nextRound();
-            }
-          }}
-          hasMore={remaining.length > 0}
-        />
-      )}
     </div>
   );
 }

@@ -13,6 +13,7 @@ interface ImportRow {
   sectionName: string;     // level name — editable
   subsectionName: string;  // subsection name — editable
   isDuplicate: boolean;
+  disabled: boolean;
 }
 
 interface ImportModalProps {
@@ -39,7 +40,7 @@ export function ImportModal({
   onImported,
 }: ImportModalProps) {
   const t = useT();
-  const { addWordPair, addSection, wordPairExistsInLanguage, fetchWordPairs } = useDataStore();
+  const { addWordPair, addSection, addLevel, wordPairExistsInLanguage, fetchWordPairs } = useDataStore();
 
   const [step, setStep] = useState<'select-file' | 'preview'>('select-file');
   const [rows, setRows] = useState<ImportRow[]>([]);
@@ -69,6 +70,7 @@ export function ImportModal({
         sectionName: section ?? '',
         subsectionName: subsection ?? '',
         isDuplicate,
+        disabled: parsed[i].disabled ?? false,
       });
     }
     setRows(built);
@@ -101,11 +103,19 @@ export function ImportModal({
     // Per-level subsection caches: levelId → Map<subsectionNameLower, subsectionId>
     const subsectionCaches = new Map<number, Map<string, number>>();
 
-    // Pre-populate current level's subsections
-    subsectionCaches.set(
-      levelId,
-      new Map(sections.map(s => [s.name.toLowerCase(), s.id]))
+    // Pre-populate current level's subsections (only if a real level is selected)
+    if (levelId > 0) {
+      subsectionCaches.set(
+        levelId,
+        new Map(sections.map(s => [s.name.toLowerCase(), s.id]))
+      );
+    }
+
+    // Cache for auto-created levels: levelNameLower → levelId
+    const levelCache = new Map<string, number>(
+      levels.map(l => [l.name.toLowerCase(), l.id])
     );
+    let defaultLevelId: number | null = null;
 
     const writtenLevelIds = new Set<number>();
 
@@ -115,8 +125,38 @@ export function ImportModal({
       // Resolve target level from section name
       let targetLevelId = levelId;
       if (row.sectionName.trim()) {
-        const match = levels.find(l => l.name.toLowerCase() === row.sectionName.trim().toLowerCase());
-        if (match) targetLevelId = match.id;
+        const key = row.sectionName.trim().toLowerCase();
+        if (levelCache.has(key)) {
+          targetLevelId = levelCache.get(key)!;
+        } else {
+          // Auto-create the level
+          await addLevel({ language_id: language.id, section_id: null, name: row.sectionName.trim(), position: 0 });
+          const newLevel = useDataStore.getState().levels.find(
+            l => l.language_id === language.id && l.name.toLowerCase() === key
+          );
+          if (newLevel) {
+            levelCache.set(key, newLevel.id);
+            targetLevelId = newLevel.id;
+          }
+        }
+      } else if (levelId === 0) {
+        // No section name and no selected level — create a default level once
+        if (defaultLevelId === null) {
+          const defaultName = language.name;
+          const existingDefault = useDataStore.getState().levels.find(
+            l => l.language_id === language.id && l.name.toLowerCase() === defaultName.toLowerCase()
+          );
+          if (existingDefault) {
+            defaultLevelId = existingDefault.id;
+          } else {
+            await addLevel({ language_id: language.id, section_id: null, name: defaultName, position: 0 });
+            const created = useDataStore.getState().levels.find(
+              l => l.language_id === language.id && l.name.toLowerCase() === defaultName.toLowerCase()
+            );
+            defaultLevelId = created?.id ?? 0;
+          }
+        }
+        targetLevelId = defaultLevelId!;
       }
 
       // Ensure subsection cache exists for target level
@@ -143,7 +183,7 @@ export function ImportModal({
         }
       }
 
-      await addWordPair({ level_id: targetLevelId, section_id: resolvedSubsectionId, source: row.source, target: row.target });
+      await addWordPair({ level_id: targetLevelId, section_id: resolvedSubsectionId, source: row.source, target: row.target, disabled: row.disabled });
       writtenLevelIds.add(targetLevelId);
       imported++;
     }

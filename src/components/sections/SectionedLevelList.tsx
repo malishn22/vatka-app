@@ -5,6 +5,8 @@ import { Button } from '../shared/Button';
 import { PlusIcon } from '../shared/Icons';
 import type { Level } from '../../types';
 import { useT } from '../../i18n/useT';
+import { useDataStore } from '../../store/dataStore';
+import { useDragContext } from '../../context/DragContext';
 
 interface SectionedLevelListProps {
   levels: Level[];
@@ -14,6 +16,21 @@ interface SectionedLevelListProps {
 export function SectionedLevelList({ levels, languageId }: SectionedLevelListProps) {
   const t = useT();
   const [showAddLevel, setShowAddLevel] = useState(false);
+  const { reorderLevels } = useDataStore();
+  const { draggingLevelId } = useDragContext();
+
+  const handleLevelDrop = (targetLevelId: number, position: 'above' | 'below') => {
+    if (draggingLevelId === null || draggingLevelId === targetLevelId) return;
+    const ids = levels.map((l) => l.id);
+    const fromIndex = ids.indexOf(draggingLevelId);
+    if (fromIndex === -1) return;
+    ids.splice(fromIndex, 1);
+    const targetIdx = ids.indexOf(targetLevelId);
+    if (targetIdx === -1) return;
+    const insertIdx = position === 'below' ? targetIdx + 1 : targetIdx;
+    ids.splice(insertIdx, 0, draggingLevelId);
+    reorderLevels(languageId, ids);
+  };
 
   return (
     <div className="flex flex-col gap-1">
@@ -27,7 +44,7 @@ export function SectionedLevelList({ levels, languageId }: SectionedLevelListPro
       {levels.length === 0 ? (
         <p className="text-xs text-gray-400 dark:text-gray-500 px-1 py-2">{t.noLevelsYet}</p>
       ) : (
-        levels.map((level) => <LevelItem key={level.id} level={level} />)
+        levels.map((level) => <LevelItem key={level.id} level={level} onLevelDrop={handleLevelDrop} />)
       )}
 
       <AddEditLevelModal

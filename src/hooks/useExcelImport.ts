@@ -6,6 +6,7 @@ export interface ParsedPair {
   target: string;
   section?: string;     // level name (col C in 4-col format)
   subsection?: string;  // subsection name (col D in 4-col, or col C in legacy 3-col)
+  disabled?: boolean;   // hidden state (col E, 'Hidden' = true)
 }
 
 interface HeaderGuard {
@@ -56,6 +57,7 @@ export function useExcelImport(onImport: (rows: ParsedPair[]) => void, headerGua
         return true;
       });
       const isFourCol = dataRows.some(row => String(row[3] ?? '').trim() !== '');
+      const hasFiveCol = dataRows.some(row => String(row[4] ?? '').trim() !== '');
 
       const pairs: ParsedPair[] = [];
       for (const row of rows) {
@@ -63,6 +65,7 @@ export function useExcelImport(onImport: (rows: ParsedPair[]) => void, headerGua
         const target = String(row[1] ?? '').trim();
         const colC = String(row[2] ?? '').trim();
         const colD = String(row[3] ?? '').trim();
+        const colE = String(row[4] ?? '').trim();
 
         // Skip header row
         if (
@@ -72,12 +75,14 @@ export function useExcelImport(onImport: (rows: ParsedPair[]) => void, headerGua
         ) continue;
 
         if (source && target) {
+          const disabled = hasFiveCol && colE.toLowerCase() === 'hidden' ? true : undefined;
           if (isFourCol) {
             pairs.push({
               source,
               target,
               ...(colC ? { section: colC } : {}),
               ...(colD ? { subsection: colD } : {}),
+              ...(disabled ? { disabled } : {}),
             });
           } else {
             // Legacy: col C = subsection
@@ -85,6 +90,7 @@ export function useExcelImport(onImport: (rows: ParsedPair[]) => void, headerGua
               source,
               target,
               ...(colC ? { subsection: colC } : {}),
+              ...(disabled ? { disabled } : {}),
             });
           }
         }
