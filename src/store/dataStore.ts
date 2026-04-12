@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { dbSelect, dbExecute } from '../db/client';
+import { dbSelect, dbExecute, dbTransaction } from '../db/client';
 import type { Language, Level, Section, WordPair } from '../types';
 
 interface DataState {
@@ -21,12 +21,15 @@ interface DataState {
   addSection: (data: Omit<Section, 'id' | 'created_at'>) => Promise<void>;
   updateSection: (id: number, data: Partial<Omit<Section, 'id' | 'created_at'>>) => Promise<void>;
   deleteSection: (id: number) => Promise<void>;
+  reorderSections: (levelId: number, orderedIds: number[]) => Promise<void>;
+  moveSection: (id: number, newLevelId: number) => Promise<void>;
 
   // Levels
   fetchLevels: (languageId: number) => Promise<void>;
   addLevel: (data: Omit<Level, 'id' | 'created_at'>) => Promise<void>;
   updateLevel: (id: number, data: Partial<Omit<Level, 'id' | 'created_at'>>) => Promise<void>;
   deleteLevel: (id: number) => Promise<void>;
+  reorderLevels: (languageId: number, orderedIds: number[]) => Promise<void>;
 
   // Word Pairs
   fetchWordPairs: (levelId: number) => Promise<void>;
@@ -122,6 +125,32 @@ export const useDataStore = create<DataState>((set, get) => ({
     await get().fetchSections(section.level_id);
   },
 
+  reorderSections: async (levelId, orderedIds) => {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await dbExecute('UPDATE sections SET position = ? WHERE id = ?', [i, orderedIds[i]]);
+    }
+    await get().fetchSections(levelId);
+  },
+
+  moveSection: async (id, newLevelId) => {
+    const section = get().sections.find((s) => s.id === id);
+    if (!section) return;
+    const oldLevelId = section.level_id;
+
+    await dbTransaction(async () => {
+      const [{ newPos }] = await dbSelect<{ newPos: number }>(
+        'SELECT COALESCE(MAX(position), -1) + 1 AS newPos FROM sections WHERE level_id = ?',
+        [newLevelId]
+      );
+      await dbExecute('UPDATE sections SET level_id = ?, position = ? WHERE id = ?', [newLevelId, newPos, id]);
+      await dbExecute('UPDATE word_pairs SET level_id = ? WHERE section_id = ?', [newLevelId, id]);
+    });
+
+    await get().fetchSections(oldLevelId);
+    await get().fetchSections(newLevelId);
+    await get().fetchWordPairs(newLevelId);
+  },
+
   deleteSection: async (id) => {
     const section = get().sections.find((s) => s.id === id);
     if (!section) return;
@@ -175,6 +204,13 @@ export const useDataStore = create<DataState>((set, get) => ({
     await get().fetchLevels(level.language_id);
   },
 
+  reorderLevels: async (languageId, orderedIds) => {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await dbExecute('UPDATE levels SET position = ? WHERE id = ?', [i, orderedIds[i]]);
+    }
+    await get().fetchLevels(languageId);
+  },
+
   // --- Word Pairs ---
   fetchWordPairs: async (levelId) => {
     set({ isLoading: true, error: null });
@@ -192,8 +228,8 @@ export const useDataStore = create<DataState>((set, get) => ({
 
   addWordPair: async (data) => {
     await dbExecute(
-      'INSERT INTO word_pairs (level_id, section_id, source, target) VALUES (?, ?, ?, ?)',
-      [data.level_id, data.section_id ?? null, data.source, data.target]
+      'INSERT INTO word_pairs (level_id, section_id, source, target, disabled) VALUES (?, ?, ?, ?, ?)',
+      [data.level_id, data.section_id ?? null, data.source, data.target, data.disabled ? 1 : 0]
     );
     await get().fetchWordPairs(data.level_id);
   },

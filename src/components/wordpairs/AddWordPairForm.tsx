@@ -4,7 +4,6 @@ import { Button } from '../shared/Button';
 import { Input } from '../shared/Input';
 import { useT } from '../../i18n/useT';
 import { usePairedPaste } from '../../hooks/usePairedPaste';
-import { ImportModal } from './ImportModal';
 
 interface AddWordPairFormProps {
   levelId: number;
@@ -14,19 +13,16 @@ interface AddWordPairFormProps {
 }
 
 export function AddWordPairForm({ levelId, sectionId, sourceLabel, targetLabel }: AddWordPairFormProps) {
-  const { addWordPair, sections, levels, wordPairExistsInLanguage, languages } = useDataStore();
+  const { addWordPair, levels, wordPairExistsInLanguage } = useDataStore();
   const t = useT();
   const [source, setSource] = useState('');
   const [target, setTarget] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [importModalOpen, setImportModalOpen] = useState(false);
+  const sourceRef = useRef<HTMLInputElement>(null);
   const targetRef = useRef<HTMLInputElement>(null);
 
   const level = levels.find((l) => l.id === levelId);
-  const language = level ? languages.find((l) => l.id === level.language_id) : undefined;
-  const levelSections = sections.filter(s => s.level_id === levelId);
-
   const handlePairedPaste = usePairedPaste((left, right) => {
     setSource(left);
     setTarget(right);
@@ -45,14 +41,16 @@ export function AddWordPairForm({ levelId, sectionId, sourceLabel, targetLabel }
     setTarget('');
     setError('');
     setMessage('');
+    sourceRef.current?.focus();
   };
 
   return (
-    <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+    <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
       <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">{t.addWordPair}</p>
       <div className="flex gap-3 items-end">
         <div className="flex-1">
           <Input
+            ref={sourceRef}
             label={sourceLabel}
             placeholder={t.wordIn(sourceLabel)}
             value={source}
@@ -75,26 +73,9 @@ export function AddWordPairForm({ levelId, sectionId, sourceLabel, targetLabel }
           />
         </div>
         <Button onClick={handleAdd} className="mb-0.5">{t.add}</Button>
-        <Button onClick={() => setImportModalOpen(true)} className="mb-0.5">
-          {t.importExcel}
-        </Button>
       </div>
       {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
       {message && <p className="text-xs text-green-600 dark:text-green-400 mt-2">{message}</p>}
-
-      {language && (
-        <ImportModal
-          isOpen={importModalOpen}
-          onClose={() => setImportModalOpen(false)}
-          levelId={levelId}
-          language={language}
-          sections={levelSections}
-          levels={levels.filter(l => l.language_id === language.id)}
-          sourceLabel={sourceLabel}
-          targetLabel={targetLabel}
-          onImported={(count, skipped) => setMessage(t.importResult(count, skipped))}
-        />
-      )}
     </div>
   );
 }

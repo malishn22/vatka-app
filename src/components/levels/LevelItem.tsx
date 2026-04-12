@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { useUIStore } from '../../store/uiStore';
 import { useDataStore } from '../../store/dataStore';
 import { useDragContext } from '../../context/DragContext';
+import { useDragSource } from '../../hooks/useDragSource';
+import { useDropTarget } from '../../hooks/useDropTarget';
+import { reorderIds } from '../../utils/reorderIds';
 import { ConfirmDialog } from '../shared/ConfirmDialog';
 import { AddEditLevelModal } from './AddEditLevelModal';
 import { SectionItem } from '../sections/SectionItem';
@@ -13,21 +16,75 @@ import { PencilIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, PlusIcon } fr
 
 interface LevelItemProps {
   level: Level;
+  onLevelDrop?: (targetLevelId: number, position: 'above' | 'below') => void;
 }
 
-export function LevelItem({ level }: LevelItemProps) {
-  const { selectedLevelId, setSelectedLevel, setView } = useUIStore();
-  const { deleteLevel, fetchSections, sections, updateWordPair } = useDataStore();
-  const { draggingPairId, setDraggingPairId } = useDragContext();
+export function LevelItem({ level, onLevelDrop }: LevelItemProps) {
+  const { selectedLevelId, setSelectedLevel, setSelectedSection, setView } = useUIStore();
+  const { deleteLevel, fetchSections, sections, wordPairs, updateWordPair, reorderSections, moveSection } = useDataStore();
+  const { draggingPairId, setDraggingPairId, draggingSectionId, setDraggingSectionId, draggingLevelId, setDraggingLevelId } = useDragContext();
   const t = useT();
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [showAddSection, setShowAddSection] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [isDragOver, setIsDragOver] = useState(false);
 
   const isSelected = selectedLevelId === level.id;
   const levelSections = sections.filter((s) => s.level_id === level.id);
+
+  // Look up dragged pair's current location
+  const draggedPair = draggingPairId !== null ? wordPairs.find((p) => p.id === draggingPairId) : null;
+  const pairBelongsToThisLevel = draggedPair?.level_id === level.id;
+
+  // Look up dragged section's current location
+  const sectionBelongsToThisLevel = draggingSectionId !== null
+    ? sections.find((s) => s.id === draggingSectionId)?.level_id === level.id
+    : false;
+
+  const canAcceptPairDrop = draggingPairId !== null && (!pairBelongsToThisLevel || draggedPair?.section_id != null);
+
+  const { dragProps, dragSourceClass } = useDragSource({
+    id: level.id,
+    setDraggingId: setDraggingLevelId,
+    isDragging: draggingLevelId === level.id,
+  });
+
+  const { dropProps, dropTargetClass } = useDropTarget({
+    acceptors: [
+      {
+        canAccept: canAcceptPairDrop,
+        mode: 'content',
+        onDrop: async () => {
+          if (draggingPairId !== null) {
+            await updateWordPair(draggingPairId, { level_id: level.id, section_id: null });
+            setDraggingPairId(null);
+          }
+        },
+      },
+      {
+        canAccept: draggingSectionId !== null && !sectionBelongsToThisLevel,
+        mode: 'content',
+        onDrop: async () => {
+          if (draggingSectionId !== null) {
+            const movedSectionId = draggingSectionId;
+            await moveSection(movedSectionId, level.id);
+            setDraggingSectionId(null);
+            setSelectedLevel(level.id);
+            setSelectedSection(movedSectionId);
+          }
+        },
+      },
+      {
+        canAccept: draggingLevelId !== null && draggingLevelId !== level.id,
+        mode: 'reorder',
+        onDrop: (position) => {
+          onLevelDrop?.(level.id, position ?? 'below');
+          setDraggingLevelId(null);
+        },
+      },
+    ],
+    showDashedHint: canAcceptPairDrop,
+  });
 
   useEffect(() => {
     if (isSelected && !expanded) {
@@ -42,6 +99,24 @@ export function LevelItem({ level }: LevelItemProps) {
     if (!expanded) {
       setExpanded(true);
       fetchSections(level.id);
+    }
+  };
+
+  const handleSectionDrop = async (targetSectionId: number, position: 'above' | 'below') => {
+    if (draggingSectionId === null || draggingSectionId === targetSectionId) return;
+    const ids = levelSections.map((s) => s.id);
+    const isSameLevel = ids.includes(draggingSectionId);
+
+    if (!isSameLevel) {
+      // Cross-level: move the section to this level first
+      await moveSection(draggingSectionId, level.id);
+      const updatedIds = useDataStore.getState().sections
+        .filter((s) => s.level_id === level.id)
+        .sort((a, b) => a.position - b.position)
+        .map((s) => s.id);
+      await reorderSections(level.id, reorderIds(updatedIds, draggingSectionId, targetSectionId, position));
+    } else {
+      await reorderSections(level.id, reorderIds(ids, draggingSectionId, targetSectionId, position));
     }
   };
 
@@ -60,18 +135,10 @@ export function LevelItem({ level }: LevelItemProps) {
             isSelected
               ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200 font-medium'
               : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-          } ${isDragOver ? 'ring-2 ring-inset ring-indigo-500 bg-indigo-50 dark:bg-indigo-900/40' : ''} ${draggingPairId !== null && !isDragOver ? 'border border-dashed border-indigo-300 dark:border-indigo-600' : ''}`}
+          } ${dropTargetClass} ${dragSourceClass}`}
           onClick={handleSelect}
-          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setIsDragOver(true); }}
-          onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragOver(false); }}
-          onDrop={async (e) => {
-            e.preventDefault();
-            setIsDragOver(false);
-            const pairId = draggingPairId ?? Number(e.dataTransfer.getData('text/plain'));
-            if (!pairId) return;
-            await updateWordPair(pairId, { level_id: level.id, section_id: null });
-            setDraggingPairId(null);
-          }}
+          {...dragProps}
+          {...dropProps}
         >
           <div className="flex items-center gap-1 min-w-0">
             <span
@@ -105,7 +172,7 @@ export function LevelItem({ level }: LevelItemProps) {
         {expanded && (
           <div className="pl-4 flex flex-col gap-0.5 mt-0.5">
             {levelSections.map((section) => (
-              <SectionItem key={section.id} section={section} />
+              <SectionItem key={section.id} section={section} onSectionDrop={handleSectionDrop} currentPairSectionId={draggedPair?.section_id} />
             ))}
             <Button
               variant="icon"

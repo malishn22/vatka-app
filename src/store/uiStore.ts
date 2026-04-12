@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware';
 import type { Lang } from '../i18n/translations';
 
 export type View = 'languages' | 'wordpairs' | 'play' | 'settings';
+export type GameMode = 'match' | 'quiz';
+export type QuizDirection = 'sourceToTarget' | 'targetToSource' | 'random';
 
 interface UIState {
   currentView: View;
@@ -13,6 +15,9 @@ interface UIState {
   lang: Lang;
   favoriteLanguages: string[];
   pairsPerRound: number;
+  gameMode: GameMode;
+  quizOptionCount: number;
+  quizDirection: QuizDirection;
   setView: (view: View) => void;
   setSelectedLanguage: (id: number | null) => void;
   setSelectedLevel: (id: number | null) => void;
@@ -21,6 +26,9 @@ interface UIState {
   setLang: (lang: Lang) => void;
   toggleFavoriteLanguage: (lang: string) => void;
   setPairsPerRound: (n: number) => void;
+  setGameMode: (mode: GameMode) => void;
+  setQuizOptionCount: (n: number) => void;
+  setQuizDirection: (dir: QuizDirection) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -34,6 +42,9 @@ export const useUIStore = create<UIState>()(
       lang: 'en',
       favoriteLanguages: [],
       pairsPerRound: 5,
+      gameMode: 'match',
+      quizOptionCount: 4,
+      quizDirection: 'sourceToTarget',
       setView: (view) => set({ currentView: view }),
       setSelectedLanguage: (id) => set({ selectedLanguageId: id, selectedLevelId: null, selectedSectionId: null, currentView: id ? 'wordpairs' : 'languages' }),
       setSelectedLevel: (id) => set({ selectedLevelId: id, selectedSectionId: null, currentView: id ? 'wordpairs' : 'languages' }),
@@ -53,10 +64,13 @@ export const useUIStore = create<UIState>()(
         }
       },
       setPairsPerRound: (n) => set({ pairsPerRound: n }),
+      setGameMode: (mode) => set({ gameMode: mode }),
+      setQuizOptionCount: (n) => set({ quizOptionCount: n }),
+      setQuizDirection: (dir) => set({ quizDirection: dir }),
     }),
     {
       name: 'ui-prefs',
-      partialize: (state) => ({ isDark: state.isDark, lang: state.lang, favoriteLanguages: state.favoriteLanguages, pairsPerRound: state.pairsPerRound }),
+      partialize: (state) => ({ isDark: state.isDark, lang: state.lang, favoriteLanguages: state.favoriteLanguages, pairsPerRound: state.pairsPerRound, quizOptionCount: state.quizOptionCount, quizDirection: state.quizDirection }),
     }
   )
 );

@@ -51,6 +51,7 @@ export const translations = {
     bothFieldsRequired: 'Both fields are required',
     wordIn: (lang: string) => `Word in ${lang}`,
     add: 'Add',
+    import: 'Import',
     importExcel: 'Import Excel',
     importResult: (count: number, skipped: number) =>
       skipped > 0
@@ -123,6 +124,26 @@ export const translations = {
     youMatchedAll: (total: number) => `You matched all ${total} word pairs.`,
     backToWords: '← Back to words',
     playAgain: 'Play again',
+
+    // Play mode selection
+    chooseGameMode: 'Choose Game Mode',
+    matchMode: 'Match',
+    matchModeDesc: 'Pair source words with their translations',
+    quizMode: 'Quiz',
+    quizModeDesc: 'Pick the correct translation from multiple choices',
+    optionCount: 'Number of choices',
+    startGame: 'Start',
+
+    // Quiz view
+    questionOf: (current: number, total: number) => `Question ${current} of ${total}`,
+    correct: 'Correct!',
+    wrong: 'Wrong!',
+    next: 'Next →',
+    quizComplete: 'Quiz Complete!',
+    yourScore: (score: number, total: number) => `You got ${score} out of ${total} correct.`,
+    needMorePairs: (n: number) => `Need at least ${n} word pairs for this mode`,
+    quizDirection: 'Direction',
+    randomDirection: 'Random',
 
     // Confirm dialog
     confirmDelete: 'Delete',
@@ -215,6 +236,7 @@ export const translations = {
     bothFieldsRequired: 'Her iki alan da zorunlu',
     wordIn: (lang: string) => `${lang} dilinde kelime`,
     add: 'Ekle',
+    import: 'İçe Aktar',
     importExcel: 'Excel İçe Aktar',
     importResult: (count: number, skipped: number) =>
       skipped > 0
@@ -287,6 +309,26 @@ export const translations = {
     youMatchedAll: (total: number) => `${total} kelime çiftinin tamamını eşleştirdiniz.`,
     backToWords: '← Kelimelere dön',
     playAgain: 'Tekrar oyna',
+
+    // Play mode selection
+    chooseGameMode: 'Oyun Modu Seçin',
+    matchMode: 'Eşleştirme',
+    matchModeDesc: 'Kaynak kelimeleri çevirileriyle eşleştirin',
+    quizMode: 'Test',
+    quizModeDesc: 'Birden fazla seçenek arasından doğru çeviriyi bulun',
+    optionCount: 'Seçenek sayısı',
+    startGame: 'Başla',
+
+    // Quiz view
+    questionOf: (current: number, total: number) => `Soru ${current} / ${total}`,
+    correct: 'Doğru!',
+    wrong: 'Yanlış!',
+    next: 'Sonraki →',
+    quizComplete: 'Test Tamamlandı!',
+    yourScore: (score: number, total: number) => `${total} sorudan ${score} tanesini doğru bildiniz.`,
+    needMorePairs: (n: number) => `Bu mod için en az ${n} kelime çifti gerekli`,
+    quizDirection: 'Yön',
+    randomDirection: 'Rastgele',
 
     // Confirm dialog
     confirmDelete: 'Sil',

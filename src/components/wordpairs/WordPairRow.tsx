@@ -6,6 +6,7 @@ import type { WordPair, Section } from '../../types';
 import { useT } from '../../i18n/useT';
 import { PencilIcon, TrashIcon, EyeIcon, EyeOffIcon } from '../shared/Icons';
 import { useDragContext } from '../../context/DragContext';
+import { useDragSource } from '../../hooks/useDragSource';
 
 interface WordPairRowProps {
   pair: WordPair;
@@ -16,6 +17,7 @@ interface WordPairRowProps {
 export function WordPairRow({ pair, showSection, sections }: WordPairRowProps) {
   const { updateWordPair, deleteWordPair } = useDataStore();
   const { draggingPairId, setDraggingPairId } = useDragContext();
+  const { dragProps, dragSourceClass } = useDragSource({ id: pair.id, setDraggingId: setDraggingPairId, isDragging: draggingPairId === pair.id });
   const t = useT();
   const [editing, setEditing] = useState(false);
   const [source, setSource] = useState(pair.source);
@@ -72,18 +74,10 @@ export function WordPairRow({ pair, showSection, sections }: WordPairRowProps) {
 
   const isDisabled = Boolean(pair.disabled);
 
-  const isDragging = draggingPairId === pair.id;
-
   return (
     <tr
-      draggable={true}
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', String(pair.id));
-        setDraggingPairId(pair.id);
-      }}
-      onDragEnd={() => setDraggingPairId(null)}
-      className={`group hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 cursor-grab ${isDisabled ? 'opacity-40' : ''} ${isDragging ? 'opacity-50' : ''}`}
+      {...dragProps}
+      className={`group hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 cursor-grab ${isDisabled ? 'opacity-40' : ''} ${dragSourceClass}`}
     >
       <td className="px-4 py-2.5 text-sm text-gray-800 dark:text-gray-200">{pair.source}</td>
       <td className="px-4 py-2.5 text-sm text-gray-800 dark:text-gray-200">{pair.target}</td>

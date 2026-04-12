@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useUIStore } from '../../store/uiStore';
 import { useDataStore } from '../../store/dataStore';
 import { useDragContext } from '../../context/DragContext';
+import { useDragSource } from '../../hooks/useDragSource';
+import { useDropTarget } from '../../hooks/useDropTarget';
 import { ConfirmDialog } from '../shared/ConfirmDialog';
 import { AddEditSectionModal } from './AddEditSectionModal';
 import { Button } from '../shared/Button';
@@ -11,20 +13,54 @@ import { PencilIcon, TrashIcon } from '../shared/Icons';
 
 interface SectionItemProps {
   section: Section;
+  onSectionDrop?: (targetSectionId: number, position: 'above' | 'below') => void;
+  currentPairSectionId?: number | null;
 }
 
-export function SectionItem({ section }: SectionItemProps) {
-  const { selectedSectionId, setSelectedSection, setView } = useUIStore();
-  const { deleteSection, updateWordPair } = useDataStore();
-  const { draggingPairId, setDraggingPairId } = useDragContext();
+export function SectionItem({ section, onSectionDrop, currentPairSectionId }: SectionItemProps) {
+  const { selectedSectionId, setSelectedLevel, setSelectedSection, setView } = useUIStore();
+  const { deleteSection, updateWordPair, sections } = useDataStore();
+  const { draggingPairId, setDraggingPairId, draggingSectionId, setDraggingSectionId } = useDragContext();
   const t = useT();
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
-  const [isDragOver, setIsDragOver] = useState(false);
 
   const isSelected = selectedSectionId === section.id;
+  const draggedSection = draggingSectionId !== null ? sections.find(s => s.id === draggingSectionId) : null;
+  const canAcceptPairDrop = draggingPairId !== null && currentPairSectionId !== section.id;
+
+  const { dragProps, dragSourceClass } = useDragSource({
+    id: section.id,
+    setDraggingId: setDraggingSectionId,
+    isDragging: draggingSectionId === section.id,
+  });
+
+  const { dropProps, dropTargetClass } = useDropTarget({
+    acceptors: [
+      {
+        canAccept: canAcceptPairDrop,
+        mode: 'content',
+        onDrop: async () => {
+          if (draggingPairId !== null) {
+            await updateWordPair(draggingPairId, { level_id: section.level_id, section_id: section.id });
+            setDraggingPairId(null);
+          }
+        },
+      },
+      {
+        canAccept: draggedSection != null && draggedSection.id !== section.id,
+        mode: 'reorder',
+        onDrop: (position) => {
+          onSectionDrop?.(section.id, position ?? 'below');
+          setDraggingSectionId(null);
+        },
+      },
+    ],
+    showDashedHint: canAcceptPairDrop,
+  });
 
   const handleSelect = () => {
+    setSelectedLevel(section.level_id);
     setSelectedSection(section.id);
     setView('wordpairs');
   };
@@ -36,18 +72,10 @@ export function SectionItem({ section }: SectionItemProps) {
           isSelected
             ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200 font-medium'
             : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'
-        } ${isDragOver ? 'ring-2 ring-inset ring-indigo-500 bg-indigo-50 dark:bg-indigo-900/40' : ''} ${draggingPairId !== null && !isDragOver ? 'border border-dashed border-indigo-300 dark:border-indigo-600' : ''}`}
+        } ${dropTargetClass} ${dragSourceClass}`}
         onClick={handleSelect}
-        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setIsDragOver(true); }}
-        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragOver(false); }}
-        onDrop={async (e) => {
-          e.preventDefault();
-          setIsDragOver(false);
-          const pairId = draggingPairId ?? Number(e.dataTransfer.getData('text/plain'));
-          if (!pairId) return;
-          await updateWordPair(pairId, { level_id: section.level_id, section_id: section.id });
-          setDraggingPairId(null);
-        }}
+        {...dragProps}
+        {...dropProps}
       >
         <span className="truncate text-xs">{section.name}</span>
         <span className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0">

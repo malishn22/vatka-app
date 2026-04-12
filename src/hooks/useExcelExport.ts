@@ -50,7 +50,7 @@ export function useExcelExport({ wordPairs, sections, level, language, onSuccess
     const levelMap = new Map<number, string>(lvls.map(l => [l.id, l.name]));
 
     const wb = XLSX.utils.book_new();
-    const header = [language.source, language.target, 'Section', 'Subsection'];
+    const header = [language.source, language.target, 'Section', 'Subsection', 'Hidden'];
 
     const makeRows = (ps: WordPair[]) =>
       ps.map(p => [
@@ -58,6 +58,7 @@ export function useExcelExport({ wordPairs, sections, level, language, onSuccess
         p.target,
         levelMap.get(p.level_id) ?? '',
         p.section_id != null ? (sectionMap.get(p.section_id) ?? '') : '',
+        p.disabled ? 'Hidden' : 'Shown',
       ]);
 
     // One sheet per level
@@ -98,11 +99,12 @@ export function useExcelExport({ wordPairs, sections, level, language, onSuccess
 
     const escapeCell = (v: string) => `"${v.replace(/"/g, '""')}"`;
     const lines = [
-      `${language.source},${language.target},Section,Subsection`,
+      `${language.source},${language.target},Section,Subsection,Hidden`,
       ...pairs.map(p => {
         const secName = p.section_id != null ? (sectionMap.get(p.section_id) ?? '') : '';
         const lvlName = levelMap.get(p.level_id) ?? '';
-        return `${escapeCell(p.source)},${escapeCell(p.target)},${escapeCell(lvlName)},${escapeCell(secName)}`;
+        const hidden = p.disabled ? 'Hidden' : 'Shown';
+        return `${escapeCell(p.source)},${escapeCell(p.target)},${escapeCell(lvlName)},${escapeCell(secName)},${escapeCell(hidden)}`;
       }),
     ];
     const path = await save({
