@@ -126,8 +126,15 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   reorderSections: async (levelId, orderedIds) => {
-    for (let i = 0; i < orderedIds.length; i++) {
-      await dbExecute('UPDATE sections SET position = ? WHERE id = ?', [i, orderedIds[i]]);
+    try {
+      await dbExecute('BEGIN');
+      for (let i = 0; i < orderedIds.length; i++) {
+        await dbExecute('UPDATE sections SET position = ? WHERE id = ?', [i, orderedIds[i]]);
+      }
+      await dbExecute('COMMIT');
+    } catch (e) {
+      await dbExecute('ROLLBACK');
+      throw e;
     }
     await get().fetchSections(levelId);
   },
@@ -196,8 +203,15 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   reorderLevels: async (languageId, orderedIds) => {
-    for (let i = 0; i < orderedIds.length; i++) {
-      await dbExecute('UPDATE levels SET position = ? WHERE id = ?', [i, orderedIds[i]]);
+    try {
+      await dbExecute('BEGIN');
+      for (let i = 0; i < orderedIds.length; i++) {
+        await dbExecute('UPDATE levels SET position = ? WHERE id = ?', [i, orderedIds[i]]);
+      }
+      await dbExecute('COMMIT');
+    } catch (e) {
+      await dbExecute('ROLLBACK');
+      throw e;
     }
     await get().fetchLevels(languageId);
   },

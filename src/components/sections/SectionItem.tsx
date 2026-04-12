@@ -16,7 +16,7 @@ interface SectionItemProps {
 }
 
 export function SectionItem({ section, onSectionDrop, currentPairSectionId }: SectionItemProps) {
-  const { selectedSectionId, setSelectedSection, setView } = useUIStore();
+  const { selectedSectionId, setSelectedLevel, setSelectedSection, setView } = useUIStore();
   const { deleteSection, updateWordPair } = useDataStore();
   const { draggingPairId, setDraggingPairId, draggingSectionId, setDraggingSectionId } = useDragContext();
   const t = useT();
@@ -33,6 +33,7 @@ export function SectionItem({ section, onSectionDrop, currentPairSectionId }: Se
   const showDashedHint = draggingPairId !== null && currentPairSectionId !== section.id;
 
   const handleSelect = () => {
+    setSelectedLevel(section.level_id);
     setSelectedSection(section.id);
     setView('wordpairs');
   };
