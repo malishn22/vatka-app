@@ -43,7 +43,7 @@ export function LevelItem({ level, onLevelDrop }: LevelItemProps) {
   const canAcceptLevelDrop = draggingLevelId !== null && draggingLevelId !== level.id;
 
   // Gating
-  const canAcceptPairDrop = draggingPairId !== null && !pairBelongsToThisLevel;
+  const canAcceptPairDrop = draggingPairId !== null && (!pairBelongsToThisLevel || draggedPair?.section_id != null);
   const canAcceptSectionDrop = draggingSectionId !== null && !sectionBelongsToThisLevel;
   const canAcceptDrop = canAcceptPairDrop || canAcceptSectionDrop || canAcceptLevelDrop;
   const showDashedHint = canAcceptPairDrop;
