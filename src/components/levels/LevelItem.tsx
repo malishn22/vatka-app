@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { useUIStore } from '../../store/uiStore';
 import { useDataStore } from '../../store/dataStore';
 import { useDragContext } from '../../context/DragContext';
+import { useDragSource } from '../../hooks/useDragSource';
+import { useDropTarget } from '../../hooks/useDropTarget';
+import { reorderIds } from '../../utils/reorderIds';
 import { ConfirmDialog } from '../shared/ConfirmDialog';
 import { AddEditLevelModal } from './AddEditLevelModal';
 import { SectionItem } from '../sections/SectionItem';
@@ -25,8 +28,6 @@ export function LevelItem({ level, onLevelDrop }: LevelItemProps) {
   const [showDelete, setShowDelete] = useState(false);
   const [showAddSection, setShowAddSection] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [isDragOver, setIsDragOver] = useState(false);
-  const [dropPosition, setDropPosition] = useState<'above' | 'below' | null>(null);
 
   const isSelected = selectedLevelId === level.id;
   const levelSections = sections.filter((s) => s.level_id === level.id);
@@ -36,17 +37,54 @@ export function LevelItem({ level, onLevelDrop }: LevelItemProps) {
   const pairBelongsToThisLevel = draggedPair?.level_id === level.id;
 
   // Look up dragged section's current location
-  const draggedSection = draggingSectionId !== null ? sections.find((s) => s.id === draggingSectionId) : null;
-  const sectionBelongsToThisLevel = draggedSection?.level_id === level.id;
+  const sectionBelongsToThisLevel = draggingSectionId !== null
+    ? sections.find((s) => s.id === draggingSectionId)?.level_id === level.id
+    : false;
 
-  // Level drag gating
-  const canAcceptLevelDrop = draggingLevelId !== null && draggingLevelId !== level.id;
-
-  // Gating
   const canAcceptPairDrop = draggingPairId !== null && (!pairBelongsToThisLevel || draggedPair?.section_id != null);
-  const canAcceptSectionDrop = draggingSectionId !== null && !sectionBelongsToThisLevel;
-  const canAcceptDrop = canAcceptPairDrop || canAcceptSectionDrop || canAcceptLevelDrop;
-  const showDashedHint = canAcceptPairDrop;
+
+  const { dragProps, dragSourceClass } = useDragSource({
+    id: level.id,
+    setDraggingId: setDraggingLevelId,
+    isDragging: draggingLevelId === level.id,
+  });
+
+  const { dropProps, dropTargetClass } = useDropTarget({
+    acceptors: [
+      {
+        canAccept: canAcceptPairDrop,
+        mode: 'content',
+        onDrop: async () => {
+          if (draggingPairId !== null) {
+            await updateWordPair(draggingPairId, { level_id: level.id, section_id: null });
+            setDraggingPairId(null);
+          }
+        },
+      },
+      {
+        canAccept: draggingSectionId !== null && !sectionBelongsToThisLevel,
+        mode: 'content',
+        onDrop: async () => {
+          if (draggingSectionId !== null) {
+            const movedSectionId = draggingSectionId;
+            await moveSection(movedSectionId, level.id);
+            setDraggingSectionId(null);
+            setSelectedLevel(level.id);
+            setSelectedSection(movedSectionId);
+          }
+        },
+      },
+      {
+        canAccept: draggingLevelId !== null && draggingLevelId !== level.id,
+        mode: 'reorder',
+        onDrop: (position) => {
+          onLevelDrop?.(level.id, position ?? 'below');
+          setDraggingLevelId(null);
+        },
+      },
+    ],
+    showDashedHint: canAcceptPairDrop,
+  });
 
   useEffect(() => {
     if (isSelected && !expanded) {
@@ -64,17 +102,22 @@ export function LevelItem({ level, onLevelDrop }: LevelItemProps) {
     }
   };
 
-  const handleSectionDrop = (targetSectionId: number, position: 'above' | 'below') => {
+  const handleSectionDrop = async (targetSectionId: number, position: 'above' | 'below') => {
     if (draggingSectionId === null || draggingSectionId === targetSectionId) return;
     const ids = levelSections.map((s) => s.id);
-    const fromIndex = ids.indexOf(draggingSectionId);
-    if (fromIndex === -1) return;
-    ids.splice(fromIndex, 1);
-    const targetIdx = ids.indexOf(targetSectionId);
-    if (targetIdx === -1) return;
-    const insertIdx = position === 'below' ? targetIdx + 1 : targetIdx;
-    ids.splice(insertIdx, 0, draggingSectionId);
-    reorderSections(level.id, ids);
+    const isSameLevel = ids.includes(draggingSectionId);
+
+    if (!isSameLevel) {
+      // Cross-level: move the section to this level first
+      await moveSection(draggingSectionId, level.id);
+      const updatedIds = useDataStore.getState().sections
+        .filter((s) => s.level_id === level.id)
+        .sort((a, b) => a.position - b.position)
+        .map((s) => s.id);
+      await reorderSections(level.id, reorderIds(updatedIds, draggingSectionId, targetSectionId, position));
+    } else {
+      reorderSections(level.id, reorderIds(ids, draggingSectionId, targetSectionId, position));
+    }
   };
 
   const handleToggleExpand = (e: React.MouseEvent) => {
@@ -92,56 +135,10 @@ export function LevelItem({ level, onLevelDrop }: LevelItemProps) {
             isSelected
               ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200 font-medium'
               : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-          } ${isDragOver ? 'ring-2 ring-inset ring-indigo-500 bg-indigo-50 dark:bg-indigo-900/40' : ''} ${showDashedHint && !isDragOver ? 'border border-dashed border-indigo-300 dark:border-indigo-600' : ''} ${draggingLevelId === level.id ? 'opacity-50' : ''} ${dropPosition === 'above' ? 'border-t-2 border-t-indigo-500' : ''} ${dropPosition === 'below' ? 'border-b-2 border-b-indigo-500' : ''}`}
+          } ${dropTargetClass} ${dragSourceClass}`}
           onClick={handleSelect}
-          draggable
-          onDragStart={(e) => {
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', String(level.id));
-            setDraggingLevelId(level.id);
-          }}
-          onDragEnd={() => setDraggingLevelId(null)}
-          onDragOver={(e) => {
-            if (!canAcceptDrop) return;
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            if (canAcceptPairDrop || canAcceptSectionDrop) {
-              setIsDragOver(true);
-            } else if (canAcceptLevelDrop) {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const mid = rect.top + rect.height / 2;
-              setDropPosition(e.clientY < mid ? 'above' : 'below');
-            }
-          }}
-          onDragLeave={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-              setIsDragOver(false);
-              setDropPosition(null);
-            }
-          }}
-          onDrop={async (e) => {
-            e.preventDefault();
-            setIsDragOver(false);
-            const pos = dropPosition;
-            setDropPosition(null);
-            if (draggingLevelId !== null && draggingLevelId !== level.id) {
-              onLevelDrop?.(level.id, pos ?? 'below');
-              setDraggingLevelId(null);
-              return;
-            }
-            if (draggingSectionId !== null && !sectionBelongsToThisLevel) {
-              const movedSectionId = draggingSectionId;
-              await moveSection(movedSectionId, level.id);
-              setDraggingSectionId(null);
-              setSelectedLevel(level.id);
-              setSelectedSection(movedSectionId);
-              return;
-            }
-            if (draggingPairId !== null) {
-              await updateWordPair(draggingPairId, { level_id: level.id, section_id: null });
-              setDraggingPairId(null);
-            }
-          }}
+          {...dragProps}
+          {...dropProps}
         >
           <div className="flex items-center gap-1 min-w-0">
             <span

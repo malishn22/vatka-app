@@ -7,6 +7,7 @@ import type { Level } from '../../types';
 import { useT } from '../../i18n/useT';
 import { useDataStore } from '../../store/dataStore';
 import { useDragContext } from '../../context/DragContext';
+import { reorderIds } from '../../utils/reorderIds';
 
 interface SectionedLevelListProps {
   levels: Level[];
@@ -21,15 +22,7 @@ export function SectionedLevelList({ levels, languageId }: SectionedLevelListPro
 
   const handleLevelDrop = (targetLevelId: number, position: 'above' | 'below') => {
     if (draggingLevelId === null || draggingLevelId === targetLevelId) return;
-    const ids = levels.map((l) => l.id);
-    const fromIndex = ids.indexOf(draggingLevelId);
-    if (fromIndex === -1) return;
-    ids.splice(fromIndex, 1);
-    const targetIdx = ids.indexOf(targetLevelId);
-    if (targetIdx === -1) return;
-    const insertIdx = position === 'below' ? targetIdx + 1 : targetIdx;
-    ids.splice(insertIdx, 0, draggingLevelId);
-    reorderLevels(languageId, ids);
+    reorderLevels(languageId, reorderIds(levels.map((l) => l.id), draggingLevelId, targetLevelId, position));
   };
 
   return (
