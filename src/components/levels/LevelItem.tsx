@@ -116,7 +116,7 @@ export function LevelItem({ level, onLevelDrop }: LevelItemProps) {
         .map((s) => s.id);
       await reorderSections(level.id, reorderIds(updatedIds, draggingSectionId, targetSectionId, position));
     } else {
-      reorderSections(level.id, reorderIds(ids, draggingSectionId, targetSectionId, position));
+      await reorderSections(level.id, reorderIds(ids, draggingSectionId, targetSectionId, position));
     }
   };
 
