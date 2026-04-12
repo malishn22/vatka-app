@@ -46,6 +46,7 @@ export function ImportModal({
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [isChecking, setIsChecking] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
 
   // Reset when modal closes
   useEffect(() => {
@@ -54,6 +55,7 @@ export function ImportModal({
       setRows([]);
       setIsChecking(false);
       setIsImporting(false);
+      setImportError(null);
     }
   }, [isOpen]);
 
@@ -100,6 +102,7 @@ export function ImportModal({
 
   const handleImport = async () => {
     setIsImporting(true);
+    setImportError(null);
     let imported = 0;
     let skipped = 0;
 
@@ -196,10 +199,13 @@ export function ImportModal({
       for (const lvlId of writtenLevelIds) {
         await fetchWordPairs(lvlId);
       }
-    } finally {
+
       setIsImporting(false);
       onImported(imported, skipped);
       onClose();
+    } catch (err) {
+      setIsImporting(false);
+      setImportError(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -248,6 +254,11 @@ export function ImportModal({
         {duplicateCount > 0 && (
           <p className="text-xs text-amber-600 dark:text-amber-400">
             {toImportCount} to import, {duplicateCount} duplicate{duplicateCount > 1 ? 's' : ''} will be skipped
+          </p>
+        )}
+        {importError && (
+          <p className="text-xs text-red-600 dark:text-red-400">
+            Import failed: {importError}
           </p>
         )}
         <datalist id="import-level-datalist">
