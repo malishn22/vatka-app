@@ -126,6 +126,15 @@ export function ImportModal({
 
       const writtenLevelIds = new Set<number>();
 
+      const nextLevelPos = () => {
+        const lvls = useDataStore.getState().levels.filter(l => l.language_id === language.id);
+        return lvls.length ? Math.max(...lvls.map(l => l.position)) + 1 : 0;
+      };
+      const nextSectionPos = (lvlId: number) => {
+        const secs = useDataStore.getState().sections.filter(s => s.level_id === lvlId);
+        return secs.length ? Math.max(...secs.map(s => s.position)) + 1 : 0;
+      };
+
       for (const row of rows) {
         if (row.isDuplicate) { skipped++; continue; }
 
@@ -137,7 +146,7 @@ export function ImportModal({
             targetLevelId = levelCache.get(key)!;
           } else {
             // Auto-create the level
-            await addLevel({ language_id: language.id, section_id: null, name: row.sectionName.trim(), position: 0 });
+            await addLevel({ language_id: language.id, section_id: null, name: row.sectionName.trim(), position: nextLevelPos() });
             const newLevel = useDataStore.getState().levels.find(
               l => l.language_id === language.id && l.name.toLowerCase() === key
             );
@@ -156,7 +165,7 @@ export function ImportModal({
             if (existingDefault) {
               defaultLevelId = existingDefault.id;
             } else {
-              await addLevel({ language_id: language.id, section_id: null, name: defaultName, position: 0 });
+              await addLevel({ language_id: language.id, section_id: null, name: defaultName, position: nextLevelPos() });
               const created = useDataStore.getState().levels.find(
                 l => l.language_id === language.id && l.name.toLowerCase() === defaultName.toLowerCase()
               );
@@ -179,7 +188,7 @@ export function ImportModal({
           if (subsectionCache.has(key)) {
             resolvedSubsectionId = subsectionCache.get(key)!;
           } else {
-            await addSection({ level_id: targetLevelId, name: row.subsectionName.trim(), position: 0 });
+            await addSection({ level_id: targetLevelId, name: row.subsectionName.trim(), position: nextSectionPos(targetLevelId) });
             const newSection = useDataStore.getState().sections.find(
               s => s.level_id === targetLevelId && s.name.toLowerCase() === key
             );
