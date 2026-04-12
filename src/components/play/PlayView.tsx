@@ -40,7 +40,7 @@ export function PlayView() {
     return () => {
       if (roundTimerRef.current) clearTimeout(roundTimerRef.current);
     };
-  }, [roundComplete]);
+  }, [roundComplete, nextRound]);
 
   if (gameMode === 'quiz') {
     return <QuizView />;
