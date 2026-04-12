@@ -19,6 +19,17 @@ export async function dbExecute(sql: string, params: unknown[] = []): Promise<vo
   await db.execute(sql, params);
 }
 
+export async function dbTransaction(fn: () => Promise<void>): Promise<void> {
+  await dbExecute('BEGIN');
+  try {
+    await fn();
+    await dbExecute('COMMIT');
+  } catch (err) {
+    await dbExecute('ROLLBACK');
+    throw err;
+  }
+}
+
 export async function runMigrations(): Promise<void> {
   try {
     await dbExecute(
