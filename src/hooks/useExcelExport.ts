@@ -1,8 +1,15 @@
-import * as XLSX from 'xlsx';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeFile } from '@tauri-apps/plugin-fs';
 import type { WordPair, Section, Level, Language } from '../types';
 import { dbSelect } from '../db/client';
+
+const isTauriRuntime = () =>
+  typeof window !== 'undefined' && typeof (window as any).__TAURI__ !== 'undefined';
+
+async function tauriInvoke<T>(command: string, args: Record<string, unknown>): Promise<T> {
+  const mod = await import('@tauri-apps/api/core');
+  return mod.invoke<T>(command, args);
+}
 
 interface UseExcelExportArgs {
   wordPairs: WordPair[];
@@ -41,44 +48,32 @@ export function useExcelExport({ wordPairs, sections, level, language, onSuccess
   };
 
   const exportXlsx = async (payload?: ExportPayload) => {
+    if (!isTauriRuntime()) {
+      throw new Error('Excel export is only available in the desktop app.');
+    }
+
     const pairs = payload?.wordPairs ?? wordPairs;
     const secs = payload?.sections ?? sections;
     const lvls = payload?.levels ?? [level];
     const label = payload?.fileLabel ?? level.name;
 
-    const sectionMap = new Map<number, string>(secs.map(s => [s.id, s.name]));
-    const levelMap = new Map<number, string>(lvls.map(l => [l.id, l.name]));
+    const buf = await tauriInvoke<number[]>('build_xlsx', {
+      payload: {
+        word_pairs: pairs.map(p => ({
+          source: p.source,
+          target: p.target,
+          level_id: p.level_id,
+          section_id: p.section_id,
+          disabled: Boolean(p.disabled),
+        })),
+        sections: secs.map(s => ({ id: s.id, name: s.name })),
+        levels: lvls.map(l => ({ id: l.id, name: l.name })),
+        file_label: label,
+        source_label: language.source,
+        target_label: language.target,
+      },
+    });
 
-    const wb = XLSX.utils.book_new();
-    const header = [language.source, language.target, 'Section', 'Subsection', 'Hidden'];
-
-    const makeRows = (ps: WordPair[]) =>
-      ps.map(p => [
-        p.source,
-        p.target,
-        levelMap.get(p.level_id) ?? '',
-        p.section_id != null ? (sectionMap.get(p.section_id) ?? '') : '',
-        p.disabled ? 'Hidden' : 'Shown',
-      ]);
-
-    // One sheet per level
-    const uniqueLevelIds = [...new Set(pairs.map(p => p.level_id))];
-    if (uniqueLevelIds.length > 1) {
-      for (const lvlId of uniqueLevelIds) {
-        const lvlPairs = pairs.filter(p => p.level_id === lvlId);
-        const sheetName = (levelMap.get(lvlId) ?? String(lvlId)).slice(0, 31);
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header, ...makeRows(lvlPairs)]), sheetName);
-      }
-    } else {
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header, ...makeRows(pairs)]), label.slice(0, 31));
-    }
-
-    // Ensure workbook has at least one sheet
-    if (wb.SheetNames.length === 0) {
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header]), label.slice(0, 31));
-    }
-
-    const buf: ArrayBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     const path = await save({
       defaultPath: safeFilename(label, 'xlsx'),
       filters: [{ name: 'Excel', extensions: ['xlsx'] }],

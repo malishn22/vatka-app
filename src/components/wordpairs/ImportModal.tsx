@@ -61,6 +61,7 @@ export function ImportModal({
 
   const handleParsed = useCallback(async (parsed: ParsedPair[]) => {
     setIsChecking(true);
+    setImportError(null);
     try {
       const built: ImportRow[] = [];
       for (let i = 0; i < parsed.length; i++) {
@@ -83,10 +84,11 @@ export function ImportModal({
     }
   }, [language.id, wordPairExistsInLanguage]);
 
-  const { triggerImport, fileInputProps } = useExcelImport(handleParsed, {
-    source: sourceLabel,
-    target: targetLabel,
-  });
+  const { triggerImport, fileInputProps } = useExcelImport(
+    handleParsed,
+    { source: sourceLabel, target: targetLabel },
+    (message) => setImportError(message),
+  );
 
   const updateRowSection = (id: string, value: string) => {
     setRows(prev => prev.map(r => r.id === id ? { ...r, sectionName: value } : r));
@@ -238,6 +240,11 @@ export function ImportModal({
     return (
       <Modal isOpen={isOpen} onClose={onClose} title={t.importExcel} footer={footer}>
         <div className="flex flex-col gap-3">
+          {importError && (
+            <p className="text-xs text-red-600 dark:text-red-400">
+              Import failed: {importError}
+            </p>
+          )}
           <p className="text-sm text-gray-700 dark:text-gray-300">{t.importFileHint}</p>
           <p className="text-xs text-gray-500 dark:text-gray-400">{t.importFormatHint}</p>
         </div>

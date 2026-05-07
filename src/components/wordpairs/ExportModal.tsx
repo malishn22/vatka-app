@@ -43,6 +43,7 @@ export function ExportModal({
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [allPairs, setAllPairs] = useState<WordPair[]>([]);
   const [allSubsections, setAllSubsections] = useState<Section[]>([]);
   const [levelMap, setLevelMap] = useState<Map<number, string>>(new Map());
@@ -54,6 +55,7 @@ export function ExportModal({
       setSelectedLevelIds(new Set(levels.map(l => l.id)));
       setSearch('');
       setSelectedIds(new Set());
+      setExportError(null);
       setAllPairs([]);
       setAllSubsections([]);
     }
@@ -156,6 +158,7 @@ export function ExportModal({
 
   const handleExport = async () => {
     setIsExporting(true);
+    setExportError(null);
     try {
       const selectedPairs = allPairs.filter(p => selectedIds.has(p.id));
       const referencedSubsectionIds = new Set(
@@ -172,6 +175,8 @@ export function ExportModal({
       };
       if (format === 'xlsx') await exportXlsx(payload);
       else await exportCsv(payload);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsExporting(false);
     }
@@ -232,6 +237,11 @@ export function ExportModal({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={t.exportModalTitle} footer={footer} size="lg">
       <div className="flex flex-col gap-3">
+        {exportError && (
+          <p className="text-xs text-red-600 dark:text-red-400">
+            Export failed: {exportError}
+          </p>
+        )}
         <input
           type="text"
           value={search}

@@ -70,7 +70,7 @@ export const translations = {
 
     // Import modal
     importChooseFile: 'Choose File',
-    importFileHint: 'Accepts .xlsx, .xls, .ods, .csv',
+    importFileHint: 'Accepts .xlsx, .ods, .csv',
     importFormatHint: 'Columns: Source | Target | Section | Subsection (optional)',
     importPreviewTitle: (n: number) => `Preview — ${n} pairs`,
     importToImport: (n: number) => `Import ${n} pairs`,
@@ -255,7 +255,7 @@ export const translations = {
 
     // Import modal
     importChooseFile: 'Dosya Seç',
-    importFileHint: '.xlsx, .xls, .ods, .csv desteklenir',
+    importFileHint: '.xlsx, .ods, .csv desteklenir',
     importFormatHint: 'Sütunlar: Kaynak | Hedef | Bölüm | Alt Bölüm (isteğe bağlı)',
     importPreviewTitle: (n: number) => `Önizleme — ${n} çift`,
     importToImport: (n: number) => `${n} çift içe aktar`,

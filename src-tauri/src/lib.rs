@@ -1,5 +1,7 @@
 use tauri_plugin_sql::{Builder as SqlBuilder, Migration, MigrationKind};
 
+mod spreadsheet;
+
 const INIT_SQL: &str = "
 PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS languages (
@@ -28,6 +30,10 @@ CREATE TABLE IF NOT EXISTS word_pairs (
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![
+            spreadsheet::parse_spreadsheet,
+            spreadsheet::build_xlsx
+        ])
         .plugin(
             SqlBuilder::default()
                 .add_migrations(
