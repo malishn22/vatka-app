@@ -6,6 +6,7 @@ import { PlayHeader } from './PlayHeader';
 import { WordCard } from './WordCard';
 import { CompletionScreen } from './CompletionScreen';
 import { QuizView } from './QuizView';
+import { ConjugationPlayView } from './ConjugationPlayView';
 import { useT } from '../../i18n/useT';
 
 export function PlayView() {
@@ -44,6 +45,10 @@ export function PlayView() {
 
   if (gameMode === 'quiz') {
     return <QuizView />;
+  }
+
+  if (gameMode === 'conjugation') {
+    return <ConjugationPlayView />;
   }
 
   const handlePlayAgain = () => {

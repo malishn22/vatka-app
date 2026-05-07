@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { dbSelect, dbExecute, dbTransaction } from '../db/client';
-import type { Language, Level, Section, WordPair } from '../types';
+import type { Language, Level, Section, WordPair, Verb, Conjugation, VerbWithConjugations } from '../types';
 
 interface DataState {
   languages: Language[];
@@ -37,6 +37,17 @@ interface DataState {
   updateWordPair: (id: number, data: Partial<Omit<WordPair, 'id' | 'created_at'>>) => Promise<void>;
   deleteWordPair: (id: number) => Promise<void>;
   wordPairExistsInLanguage: (languageId: number, source: string, target: string) => Promise<boolean>;
+
+  // Verbs
+  verbs: VerbWithConjugations[];
+  fetchVerbs: (levelId: number) => Promise<void>;
+  addVerb: (verb: Omit<Verb, 'id' | 'created_at'>, conjugations: Omit<Conjugation, 'id' | 'verb_id' | 'created_at'>[]) => Promise<void>;
+  updateVerb: (id: number, verb: Partial<Omit<Verb, 'id' | 'created_at'>>, conjugations: Omit<Conjugation, 'id' | 'verb_id' | 'created_at'>[]) => Promise<void>;
+  deleteVerb: (id: number) => Promise<void>;
+  toggleVerbDisabled: (id: number) => Promise<void>;
+  verbExistsInLanguage: (languageId: number, infinitiveSource: string, infinitiveTarget: string) => Promise<boolean>;
+  fetchUsedTenses: (languageId: number) => Promise<string[]>;
+  fetchUsedPersons: (languageId: number) => Promise<string[]>;
 }
 
 export const useDataStore = create<DataState>((set, get) => ({
@@ -44,6 +55,7 @@ export const useDataStore = create<DataState>((set, get) => ({
   sections: [],
   levels: [],
   wordPairs: [],
+  verbs: [],
   isLoading: false,
   error: null,
 
@@ -200,6 +212,7 @@ export const useDataStore = create<DataState>((set, get) => ({
       levels: state.levels.filter((l) => l.id !== id),
       sections: state.sections.filter((s) => s.level_id !== id),
       wordPairs: state.wordPairs.filter((wp) => wp.level_id !== id),
+      verbs: state.verbs.filter((v) => v.level_id !== id),
     }));
     await get().fetchLevels(level.language_id);
   },
@@ -264,15 +277,144 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   wordPairExistsInLanguage: async (languageId, source, target) => {
-    const rows = await dbSelect<{ found: number }>(
-      `SELECT 1 AS found FROM word_pairs wp
-       JOIN levels l ON wp.level_id = l.id
-       WHERE l.language_id = ?
-         AND LOWER(TRIM(wp.source)) = LOWER(TRIM(?))
-         AND LOWER(TRIM(wp.target)) = LOWER(TRIM(?))
-       LIMIT 1`,
-      [languageId, source, target]
+    try {
+      const rows = await dbSelect<{ found: number }>(
+        `SELECT 1 AS found FROM word_pairs wp
+         JOIN levels l ON wp.level_id = l.id
+         WHERE l.language_id = ?
+           AND LOWER(TRIM(wp.source)) = LOWER(TRIM(?))
+           AND LOWER(TRIM(wp.target)) = LOWER(TRIM(?))
+         LIMIT 1`,
+        [languageId, source, target]
+      );
+      return rows.length > 0;
+    } catch {
+      return false;
+    }
+  },
+
+  // --- Verbs ---
+  fetchVerbs: async (levelId) => {
+    try {
+      const verbRows = await dbSelect<Verb & { disabled: number | boolean }>(
+        'SELECT * FROM verbs WHERE level_id = ? ORDER BY id',
+        [levelId]
+      );
+      const conjugationRows = await dbSelect<Conjugation>(
+        'SELECT c.* FROM conjugations c JOIN verbs v ON c.verb_id = v.id WHERE v.level_id = ? ORDER BY c.id',
+        [levelId]
+      );
+      const verbs: VerbWithConjugations[] = verbRows.map((v) => ({
+        ...v,
+        disabled: Boolean(v.disabled),
+        section_id: v.section_id ?? null,
+        conjugations: conjugationRows.filter((c) => c.verb_id === v.id),
+      }));
+      set({ verbs });
+    } catch (e) {
+      set({ error: String(e) });
+    }
+  },
+
+  addVerb: async (verb, conjugations) => {
+    try {
+      const result = await dbExecute(
+        'INSERT INTO verbs (level_id, section_id, infinitive_source, infinitive_target, disabled) VALUES (?, ?, ?, ?, ?)',
+        [verb.level_id, verb.section_id ?? null, verb.infinitive_source, verb.infinitive_target, verb.disabled ? 1 : 0]
+      );
+      const verbId = result.lastInsertId;
+      for (const c of conjugations) {
+        await dbExecute(
+          'INSERT INTO conjugations (verb_id, tense, person, form) VALUES (?, ?, ?, ?)',
+          [verbId, c.tense, c.person, c.form]
+        );
+      }
+    } finally {
+      await get().fetchVerbs(verb.level_id);
+    }
+  },
+
+  updateVerb: async (id, verb, conjugations) => {
+    const existing = get().verbs.find((v) => v.id === id);
+    if (!existing) return;
+    const levelId = verb.level_id ?? existing.level_id;
+    await dbExecute(
+      'UPDATE verbs SET infinitive_source = ?, infinitive_target = ?, disabled = ?, level_id = ?, section_id = ? WHERE id = ?',
+      [
+        verb.infinitive_source ?? existing.infinitive_source,
+        verb.infinitive_target ?? existing.infinitive_target,
+        verb.disabled !== undefined ? (verb.disabled ? 1 : 0) : (existing.disabled ? 1 : 0),
+        levelId,
+        'section_id' in verb ? verb.section_id : existing.section_id,
+        id,
+      ]
     );
-    return rows.length > 0;
+    await dbExecute('DELETE FROM conjugations WHERE verb_id = ?', [id]);
+    for (const c of conjugations) {
+      await dbExecute(
+        'INSERT INTO conjugations (verb_id, tense, person, form) VALUES (?, ?, ?, ?)',
+        [id, c.tense, c.person, c.form]
+      );
+    }
+    await get().fetchVerbs(levelId);
+  },
+
+  deleteVerb: async (id) => {
+    const verb = get().verbs.find((v) => v.id === id);
+    if (!verb) return;
+    await dbExecute('DELETE FROM verbs WHERE id = ?', [id]);
+    set((state) => ({ verbs: state.verbs.filter((v) => v.id !== id) }));
+  },
+
+  toggleVerbDisabled: async (id) => {
+    const verb = get().verbs.find((v) => v.id === id);
+    if (!verb) return;
+    const newDisabled = verb.disabled ? 0 : 1;
+    await dbExecute('UPDATE verbs SET disabled = ? WHERE id = ?', [newDisabled, id]);
+    set((state) => ({
+      verbs: state.verbs.map((v) => v.id === id ? { ...v, disabled: !v.disabled } : v),
+    }));
+  },
+
+  verbExistsInLanguage: async (languageId, infinitiveSource, infinitiveTarget) => {
+    try {
+      const rows = await dbSelect<{ found: number }>(
+        `SELECT 1 AS found FROM verbs v
+         JOIN levels l ON v.level_id = l.id
+         WHERE l.language_id = ?
+           AND LOWER(TRIM(v.infinitive_source)) = LOWER(TRIM(?))
+           AND LOWER(TRIM(v.infinitive_target)) = LOWER(TRIM(?))
+         LIMIT 1`,
+        [languageId, infinitiveSource, infinitiveTarget]
+      );
+      return rows.length > 0;
+    } catch {
+      return false;
+    }
+  },
+
+  fetchUsedTenses: async (languageId) => {
+    const rows = await dbSelect<{ tense: string }>(
+      `SELECT DISTINCT c.tense FROM conjugations c
+       JOIN verbs v ON c.verb_id = v.id
+       JOIN levels l ON v.level_id = l.id
+       WHERE l.language_id = ?
+       ORDER BY c.tense`,
+      [languageId]
+    );
+    return rows.map((r) => r.tense);
+  },
+
+  fetchUsedPersons: async (languageId) => {
+    const rows = await dbSelect<{ person: string }>(
+      `SELECT c.person FROM conjugations c
+       JOIN verbs v ON c.verb_id = v.id
+       JOIN levels l ON v.level_id = l.id
+       WHERE l.language_id = ?
+       GROUP BY c.person
+       ORDER BY MIN(c.id)`,
+      [languageId]
+    );
+    return rows.map((r) => r.person);
   },
 }));

@@ -161,6 +161,41 @@ export const translations = {
     languageAlreadyExists: 'This language pair already exists.',
     wordPairAlreadyExists: 'This word pair already exists in this language.',
 
+    // Content tabs
+    wordPairsTab: 'Word Pairs',
+    verbsTab: 'Verbs',
+
+    // Verbs
+    verb: 'verb',
+    verbs: 'verbs',
+    addVerb: 'Add verb',
+    editVerb: 'Edit Verb',
+    noVerbsYet: 'No verbs yet. Add some above.',
+    infinitive: 'infinitive',
+    tense: 'tense',
+    tenses: 'tenses',
+    forms: 'forms',
+    tenseName: 'Tense name (e.g. Present, Past)',
+    person: 'Person (e.g. yo, tu, el)',
+    conjugatedForm: 'Conjugated form',
+    addPersonForm: 'Add person',
+    addTense: 'Add tense',
+    addAtLeastOneConjugation: 'Add at least one conjugation',
+    fillPersons: 'Fill persons',
+    verbAlreadyExists: 'This verb already exists in this language.',
+
+    // Conjugation play mode
+    conjugationMode: 'Conjugation',
+    conjugationModeDesc: 'Practice verb conjugation forms',
+    conjugate: 'Conjugate',
+    answerMode: 'Answer mode',
+    multipleChoice: 'Multiple choice',
+    typeAnswer: 'Type answer',
+    typeYourAnswer: 'Type the conjugated form...',
+    checkAnswer: 'Check',
+    correctAnswer: 'Correct answer',
+    needMoreConjugations: 'Need at least 2 conjugation forms to practice',
+
     // Language names (for dropdown labels)
     languageNames: {
       Afrikaans: 'Afrikaans', Albanian: 'Albanian', Arabic: 'Arabic',
@@ -345,6 +380,41 @@ export const translations = {
     removeFavorite: 'Kaldır',
     languageAlreadyExists: 'Bu dil çifti zaten mevcut.',
     wordPairAlreadyExists: 'Bu kelime çifti bu dilde zaten mevcut.',
+
+    // Content tabs
+    wordPairsTab: 'Kelime Çiftleri',
+    verbsTab: 'Fiiller',
+
+    // Verbs
+    verb: 'fiil',
+    verbs: 'fiil',
+    addVerb: 'Fiil ekle',
+    editVerb: 'Fiili Düzenle',
+    noVerbsYet: 'Henüz fiil yok. Yukarıdan ekleyin.',
+    infinitive: 'mastar',
+    tense: 'zaman',
+    tenses: 'zaman',
+    forms: 'form',
+    tenseName: 'Zaman adı (örn. Şimdiki, Geçmiş)',
+    person: 'Kişi (örn. ben, sen, o)',
+    conjugatedForm: 'Çekimli form',
+    addPersonForm: 'Kişi ekle',
+    addTense: 'Zaman ekle',
+    addAtLeastOneConjugation: 'En az bir çekim ekleyin',
+    fillPersons: 'Kişileri doldur',
+    verbAlreadyExists: 'Bu fiil bu dilde zaten mevcut.',
+
+    // Conjugation play mode
+    conjugationMode: 'Çekim',
+    conjugationModeDesc: 'Fiil çekim formlarını pratik yapın',
+    conjugate: 'Çekimleyin',
+    answerMode: 'Cevap modu',
+    multipleChoice: 'Çoktan seçmeli',
+    typeAnswer: 'Yazarak',
+    typeYourAnswer: 'Çekimli formu yazın...',
+    checkAnswer: 'Kontrol et',
+    correctAnswer: 'Doğru cevap',
+    needMoreConjugations: 'Pratik için en az 2 çekim formu gerekli',
 
     // Language names (for dropdown labels)
     languageNames: {

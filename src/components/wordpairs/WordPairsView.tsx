@@ -3,8 +3,10 @@ import { useUIStore } from '../../store/uiStore';
 import { useDataStore } from '../../store/dataStore';
 import { usePlayStore } from '../../store/playStore';
 import { useQuizStore } from '../../store/quizStore';
+import { useConjugationPlayStore } from '../../store/conjugationPlayStore';
 import { WordPairRow } from './WordPairRow';
 import { AddWordPairForm } from './AddWordPairForm';
+import { VerbsView } from '../verbs/VerbsView';
 import { Button } from '../shared/Button';
 import { Toast } from '../shared/Toast';
 import { useT } from '../../i18n/useT';
@@ -14,10 +16,11 @@ import { PlayModeModal } from '../play/PlayModeModal';
 import type { GameMode } from '../../store/uiStore';
 
 export function WordPairsView() {
-  const { selectedLevelId, selectedSectionId, selectedLanguageId, setView, quizOptionCount, quizDirection } = useUIStore();
-  const { levels, languages, sections, wordPairs, fetchWordPairs } = useDataStore();
+  const { selectedLevelId, selectedSectionId, selectedLanguageId, setView, quizOptionCount, quizDirection, contentTab, setContentTab, conjugationMode, conjugationOptionCount } = useUIStore();
+  const { levels, languages, sections, wordPairs, fetchWordPairs, verbs, fetchVerbs } = useDataStore();
   const { initGame } = usePlayStore();
   const { initQuiz } = useQuizStore();
+  const { initConjugationPlay } = useConjugationPlayStore();
   const t = useT();
   const [addFormOpen, setAddFormOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -45,6 +48,7 @@ export function WordPairsView() {
   useEffect(() => {
     if (selectedLevelId !== null) {
       fetchWordPairs(selectedLevelId);
+      fetchVerbs(selectedLevelId);
     }
   }, [selectedLevelId]);
 
@@ -54,8 +58,16 @@ export function WordPairsView() {
 
   const activePairs = displayedPairs.filter((p) => !p.disabled);
 
+  const displayedVerbs = selectedSectionId !== null
+    ? verbs.filter((v) => v.section_id === selectedSectionId)
+    : verbs;
+  const activeVerbs = displayedVerbs.filter((v) => !v.disabled);
+  const activeConjugations = activeVerbs.flatMap((v) => v.conjugations);
+
+  const canPlay = activePairs.length >= 2 || activeConjugations.length >= 2;
+
   const handlePlay = () => {
-    if (activePairs.length < 2) return;
+    if (!canPlay) return;
     setPlayModalOpen(true);
   };
 
@@ -63,8 +75,10 @@ export function WordPairsView() {
     setPlayModalOpen(false);
     if (mode === 'match') {
       initGame(activePairs);
-    } else {
+    } else if (mode === 'quiz') {
       initQuiz(activePairs, quizOptionCount, quizDirection);
+    } else if (mode === 'conjugation') {
+      initConjugationPlay(activeVerbs, conjugationMode, conjugationOptionCount);
     }
     setView('play');
   };
@@ -98,88 +112,120 @@ export function WordPairsView() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">{language?.name}</p>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-50">
             {level.name}{section ? ` — ${section.name}` : ''}
           </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {displayedPairs.length} {displayedPairs.length !== 1 ? t.wordPairs : t.wordPair}
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
             onClick={handlePlay}
-            disabled={activePairs.length < 2}
-            title={activePairs.length < 2 ? t.needAtLeastTwoWordPairs : ''}
+            disabled={!canPlay}
+            title={!canPlay ? t.needAtLeastTwoWordPairs : ''}
           >
             {t.play}
           </Button>
-
-          <div className="relative" ref={addFormRef}>
-            <Button
-              variant="secondary"
-              onClick={() => setAddFormOpen((o) => !o)}
-              className="!rounded-full w-9 h-9 !px-0 !py-0 flex items-center justify-center"
-            >
-              +
-            </Button>
-            {addFormOpen && (
-              <div className="absolute right-0 mt-1 w-[480px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10">
-                <AddWordPairForm
-                  levelId={level.id}
-                  sectionId={selectedSectionId}
-                  sourceLabel={language?.source ?? t.source}
-                  targetLabel={language?.target ?? t.target}
-                />
-                <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 flex gap-2">
-                  <Button variant="secondary" onClick={() => setImportModalOpen(true)}>
-                    {t.importExcel}
-                  </Button>
-                  <Button variant="secondary" onClick={() => { setExportFormat('xlsx'); setAddFormOpen(false); }} disabled={wordPairs.length === 0}>
-                    {t.exportExcel}
-                  </Button>
-                  <Button variant="secondary" onClick={() => { setExportFormat('csv'); setAddFormOpen(false); }} disabled={wordPairs.length === 0}>
-                    {t.exportCsv}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
-      {displayedPairs.length === 0 ? (
-        <div className="text-center py-8 text-gray-400 dark:text-gray-500">
-          <p>{t.noWordPairsYet}</p>
-        </div>
+      {/* Tab toggle */}
+      <div className="flex gap-1 bg-gray-100 dark:bg-gray-700 rounded-lg p-1 mb-4">
+        <button
+          onClick={() => setContentTab('wordpairs')}
+          className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            contentTab === 'wordpairs'
+              ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-50 shadow-sm'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+          }`}
+        >
+          {t.wordPairsTab} ({displayedPairs.length})
+        </button>
+        <button
+          onClick={() => setContentTab('verbs')}
+          className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            contentTab === 'verbs'
+              ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-50 shadow-sm'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+          }`}
+        >
+          {t.verbsTab} ({displayedVerbs.length})
+        </button>
+      </div>
+
+      {contentTab === 'wordpairs' ? (
+        <>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {displayedPairs.length} {displayedPairs.length !== 1 ? t.wordPairs : t.wordPair}
+            </p>
+            <div className="relative" ref={addFormRef}>
+              <Button
+                variant="secondary"
+                onClick={() => setAddFormOpen((o) => !o)}
+                className="!rounded-full w-9 h-9 !px-0 !py-0 flex items-center justify-center"
+              >
+                +
+              </Button>
+              {addFormOpen && (
+                <div className="absolute right-0 mt-1 w-[480px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10">
+                  <AddWordPairForm
+                    levelId={level.id}
+                    sectionId={selectedSectionId}
+                    sourceLabel={language?.source ?? t.source}
+                    targetLabel={language?.target ?? t.target}
+                  />
+                  <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 flex gap-2">
+                    <Button variant="secondary" onClick={() => setImportModalOpen(true)}>
+                      {t.importExcel}
+                    </Button>
+                    <Button variant="secondary" onClick={() => { setExportFormat('xlsx'); setAddFormOpen(false); }} disabled={wordPairs.length === 0}>
+                      {t.exportExcel}
+                    </Button>
+                    <Button variant="secondary" onClick={() => { setExportFormat('csv'); setAddFormOpen(false); }} disabled={wordPairs.length === 0}>
+                      {t.exportCsv}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {displayedPairs.length === 0 ? (
+            <div className="text-center py-8 text-gray-400 dark:text-gray-500">
+              <p>{t.noWordPairsYet}</p>
+            </div>
+          ) : (
+            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                  <tr>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                      {language?.source ?? t.source}
+                    </th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                      {language?.target ?? t.target}
+                    </th>
+                    {selectedSectionId === null && (
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                        {t.section}
+                      </th>
+                    )}
+                    <th className="px-4 py-2.5" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayedPairs.map((pair) => (
+                    <WordPairRow key={pair.id} pair={pair} showSection={selectedSectionId === null} sections={sections} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       ) : (
-        <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-              <tr>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                  {language?.source ?? t.source}
-                </th>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                  {language?.target ?? t.target}
-                </th>
-                {selectedSectionId === null && (
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                    {t.section}
-                  </th>
-                )}
-                <th className="px-4 py-2.5" />
-              </tr>
-            </thead>
-            <tbody>
-              {displayedPairs.map((pair) => (
-                <WordPairRow key={pair.id} pair={pair} showSection={selectedSectionId === null} sections={sections} />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <VerbsView />
       )}
 
       {toastMsg && <Toast message={toastMsg} onDone={() => setToastMsg(null)} />}
@@ -217,6 +263,7 @@ export function WordPairsView() {
         onClose={() => setPlayModalOpen(false)}
         onStart={handleStartGame}
         maxOptions={activePairs.length}
+        maxConjugations={activeConjugations.length}
         sourceLang={language?.source ?? ''}
         targetLang={language?.target ?? ''}
       />

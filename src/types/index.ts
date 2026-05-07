@@ -32,3 +32,26 @@ export interface WordPair {
   disabled?: boolean;
   created_at?: string;
 }
+
+export interface Verb {
+  id: number;
+  level_id: number;
+  section_id: number | null;
+  infinitive_source: string;
+  infinitive_target: string;
+  disabled?: boolean;
+  created_at?: string;
+}
+
+export interface Conjugation {
+  id: number;
+  verb_id: number;
+  tense: string;
+  person: string;
+  form: string;
+  created_at?: string;
+}
+
+export interface VerbWithConjugations extends Verb {
+  conjugations: Conjugation[];
+}

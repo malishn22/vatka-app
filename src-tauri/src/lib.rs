@@ -25,6 +25,23 @@ CREATE TABLE IF NOT EXISTS word_pairs (
   target     TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS verbs (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  level_id          INTEGER NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
+  section_id        INTEGER REFERENCES sections(id) ON DELETE SET NULL,
+  infinitive_source TEXT NOT NULL,
+  infinitive_target TEXT NOT NULL,
+  disabled          INTEGER NOT NULL DEFAULT 0,
+  created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS conjugations (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  verb_id    INTEGER NOT NULL REFERENCES verbs(id) ON DELETE CASCADE,
+  tense      TEXT NOT NULL,
+  person     TEXT NOT NULL,
+  form       TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 ";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
