@@ -4,7 +4,7 @@ import type { WordPair, Section, Level, Language, Verb, Conjugation, VerbWithCon
 import { dbSelect } from '../db/client';
 
 const isTauriRuntime = () =>
-  typeof window !== 'undefined' && typeof (window as any).__TAURI__ !== 'undefined';
+  typeof window !== 'undefined' && typeof (window as any).__TAURI_INTERNALS__ !== 'undefined';
 
 async function tauriInvoke<T>(command: string, args: Record<string, unknown>): Promise<T> {
   const mod = await import('@tauri-apps/api/core');

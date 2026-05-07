@@ -34,7 +34,7 @@ interface HeaderGuard {
 }
 
 const isTauriRuntime = () =>
-  typeof window !== 'undefined' && typeof (window as any).__TAURI__ !== 'undefined';
+  typeof window !== 'undefined' && typeof (window as any).__TAURI_INTERNALS__ !== 'undefined';
 
 async function tauriInvoke<T>(command: string, args: Record<string, unknown>): Promise<T> {
   const mod = await import('@tauri-apps/api/core');
@@ -332,7 +332,7 @@ export function useExcelImport(
           const parsed = await tauriInvoke<ParsedSpreadsheetResult>('parse_spreadsheet', {
             bytes: Array.from(bytes),
             filename: file.name,
-            header_guard: headerGuard ?? null,
+            headerGuard: headerGuard ?? null,
           });
           onImport(parsed);
           return;
