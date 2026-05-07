@@ -323,7 +323,7 @@ export const useDataStore = create<DataState>((set, get) => ({
         'INSERT INTO verbs (level_id, section_id, infinitive_source, infinitive_target, disabled) VALUES (?, ?, ?, ?, ?)',
         [verb.level_id, verb.section_id ?? null, verb.infinitive_source, verb.infinitive_target, verb.disabled ? 1 : 0]
       );
-      const verbId = result.lastInsertId;
+      const verbId = result.lastInsertId!;
       for (const c of conjugations) {
         await dbExecute(
           'INSERT INTO conjugations (verb_id, tense, person, form) VALUES (?, ?, ?, ?)',

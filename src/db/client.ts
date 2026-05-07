@@ -14,7 +14,7 @@ export async function dbSelect<T>(sql: string, params: unknown[] = []): Promise<
   return db.select<T[]>(sql, params);
 }
 
-export async function dbExecute(sql: string, params: unknown[] = []): Promise<{ lastInsertId: number; rowsAffected: number }> {
+export async function dbExecute(sql: string, params: unknown[] = []): Promise<{ lastInsertId?: number; rowsAffected: number }> {
   const db = await getDb();
   return db.execute(sql, params);
 }
