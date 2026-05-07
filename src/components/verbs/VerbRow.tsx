@@ -5,6 +5,7 @@ import { useDragSource } from '../../hooks/useDragSource';
 import { Button } from '../shared/Button';
 import { useT } from '../../i18n/useT';
 import { PencilIcon, TrashIcon, EyeIcon, EyeOffIcon, ChevronDownIcon, ChevronRightIcon } from '../shared/Icons';
+import { SectionBadge } from '../shared/SectionBadge';
 import type { VerbWithConjugations } from '../../types';
 
 interface VerbRowProps {
@@ -54,12 +55,12 @@ export function VerbRow({ verb, onEdit, showSection, sectionName }: VerbRowProps
           <span className="text-xs text-gray-400 dark:text-gray-500 ml-3">
             {tenseNames.length} {tenseNames.length === 1 ? t.tense : t.tenses} &middot; {verb.conjugations.length} {t.forms}
           </span>
-          {showSection && (
-            <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">
-              &middot; {sectionName ?? '—'}
-            </span>
-          )}
         </div>
+        {showSection && (
+          <span className="flex-shrink-0">
+            <SectionBadge name={sectionName} />
+          </span>
+        )}
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
           <Button
             variant="icon"

@@ -5,6 +5,7 @@ import { Input } from '../shared/Input';
 import type { WordPair, Section } from '../../types';
 import { useT } from '../../i18n/useT';
 import { PencilIcon, TrashIcon, EyeIcon, EyeOffIcon } from '../shared/Icons';
+import { SectionBadge } from '../shared/SectionBadge';
 import { useDragContext } from '../../context/DragContext';
 import { useDragSource } from '../../hooks/useDragSource';
 
@@ -58,8 +59,8 @@ export function WordPairRow({ pair, showSection, sections }: WordPairRowProps) {
           />
         </td>
         {showSection && (
-          <td className="px-4 py-2 text-xs text-gray-400 dark:text-gray-500">
-            {sections?.find((s) => s.id === pair.section_id)?.name ?? '—'}
+          <td className="px-4 py-2">
+            <SectionBadge name={sections?.find((s) => s.id === pair.section_id)?.name} />
           </td>
         )}
         <td className="px-4 py-2 text-right">
@@ -82,8 +83,8 @@ export function WordPairRow({ pair, showSection, sections }: WordPairRowProps) {
       <td className="px-4 py-2.5 text-sm text-gray-800 dark:text-gray-200">{pair.source}</td>
       <td className="px-4 py-2.5 text-sm text-gray-800 dark:text-gray-200">{pair.target}</td>
       {showSection && (
-        <td className="px-4 py-2.5 text-xs text-gray-400 dark:text-gray-500">
-          {sections?.find((s) => s.id === pair.section_id)?.name ?? '—'}
+        <td className="px-4 py-2.5">
+          <SectionBadge name={sections?.find((s) => s.id === pair.section_id)?.name} />
         </td>
       )}
       <td className="px-4 py-2.5 text-right">
