@@ -1,14 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Modal } from '../shared/Modal';
 import { Button } from '../shared/Button';
-import type { WordPair, Section, Level, Language, VerbWithConjugations } from '../../types';
-import { useExcelExport, fetchWordPairsRaw, fetchSectionsRaw, fetchVerbsRaw, type ExportPayload } from '../../hooks/useExcelExport';
+import type { Level, Language, Section, VerbWithConjugations } from '../../types';
+import { useExcelExport, fetchVerbsRaw, fetchSectionsRaw, type ExportPayload } from '../../hooks/useExcelExport';
 import { useT } from '../../i18n/useT';
 
 type ExportFormat = 'xlsx' | 'csv';
-type ExportStep = 'select-levels' | 'select-pairs';
+type ExportStep = 'select-levels' | 'select-verbs';
 
-interface ExportModalProps {
+interface VerbExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   format: ExportFormat;
@@ -16,11 +16,11 @@ interface ExportModalProps {
   levels: Level[];
   currentLevelId: number;
   sections: Section[];
-  wordPairs: WordPair[];
+  verbs: VerbWithConjugations[];
   onSuccess: () => void;
 }
 
-export function ExportModal({
+export function VerbExportModal({
   isOpen,
   onClose,
   format,
@@ -28,40 +28,32 @@ export function ExportModal({
   levels,
   currentLevelId,
   sections,
-  wordPairs,
+  verbs,
   onSuccess,
-}: ExportModalProps) {
+}: VerbExportModalProps) {
   const t = useT();
   const currentLevel = levels.find(l => l.id === currentLevelId);
 
-  // Step 1 state
   const [step, setStep] = useState<ExportStep>('select-levels');
   const [selectedLevelIds, setSelectedLevelIds] = useState<Set<number>>(new Set());
-  const [includeVerbs, setIncludeVerbs] = useState(true);
 
-  // Step 2 state
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
-  const [allPairs, setAllPairs] = useState<WordPair[]>([]);
-  const [allSubsections, setAllSubsections] = useState<Section[]>([]);
   const [allVerbs, setAllVerbs] = useState<VerbWithConjugations[]>([]);
-  const [levelMap, setLevelMap] = useState<Map<number, string>>(new Map());
+  const [allSubsections, setAllSubsections] = useState<Section[]>([]);
 
-  // Reset when modal opens
   useEffect(() => {
     if (isOpen) {
       setStep('select-levels');
       setSelectedLevelIds(new Set(levels.map(l => l.id)));
-      setIncludeVerbs(true);
       setSearch('');
       setSelectedIds(new Set());
       setExportError(null);
-      setAllPairs([]);
-      setAllSubsections([]);
       setAllVerbs([]);
+      setAllSubsections([]);
     }
   }, [isOpen, levels]);
 
@@ -77,18 +69,15 @@ export function ExportModal({
   const handleNext = async () => {
     setIsLoading(true);
     try {
-      const combinedPairs: WordPair[] = [];
-      const combinedSubsections: Section[] = [];
       const combinedVerbs: VerbWithConjugations[] = [];
+      const combinedSubsections: Section[] = [];
       const seenSubsectionIds = new Set<number>();
-      const newLevelMap = new Map<number, string>();
 
       for (const lv of levels) {
         if (!selectedLevelIds.has(lv.id)) continue;
-        newLevelMap.set(lv.id, lv.name);
 
-        const pairs = lv.id === currentLevelId ? wordPairs : await fetchWordPairsRaw(lv.id);
-        combinedPairs.push(...pairs);
+        const lvVerbs = lv.id === currentLevelId ? verbs : await fetchVerbsRaw(lv.id);
+        combinedVerbs.push(...lvVerbs);
 
         const subs = lv.id === currentLevelId ? sections : await fetchSectionsRaw(lv.id);
         for (const sub of subs) {
@@ -97,39 +86,36 @@ export function ExportModal({
             seenSubsectionIds.add(sub.id);
           }
         }
-
-        if (includeVerbs) {
-          const verbs = await fetchVerbsRaw(lv.id);
-          combinedVerbs.push(...verbs);
-        }
       }
 
-      setAllPairs(combinedPairs);
-      setAllSubsections(combinedSubsections);
       setAllVerbs(combinedVerbs);
-      setLevelMap(newLevelMap);
-      setSelectedIds(new Set(combinedPairs.map(p => p.id)));
-      setStep('select-pairs');
+      setAllSubsections(combinedSubsections);
+      setSelectedIds(new Set(combinedVerbs.map(v => v.id)));
+      setStep('select-verbs');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Step 2 derived
   const subsectionMap = useMemo(
     () => new Map<number, string>(allSubsections.map(s => [s.id, s.name])),
     [allSubsections]
   );
 
-  const filteredPairs = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return allPairs;
-    return allPairs.filter(
-      p => p.source.toLowerCase().includes(q) || p.target.toLowerCase().includes(q)
-    );
-  }, [allPairs, search]);
+  const levelMap = useMemo(
+    () => new Map<number, string>(levels.map(l => [l.id, l.name])),
+    [levels]
+  );
 
-  const togglePair = (id: number) => {
+  const filteredVerbs = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return allVerbs;
+    return allVerbs.filter(
+      v => v.infinitive_source.toLowerCase().includes(q) || v.infinitive_target.toLowerCase().includes(q)
+    );
+  }, [allVerbs, search]);
+
+  const toggleVerb = (id: number) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -138,12 +124,12 @@ export function ExportModal({
     });
   };
 
-  const allFilteredSelected = filteredPairs.length > 0 && filteredPairs.every(p => selectedIds.has(p.id));
+  const allFilteredSelected = filteredVerbs.length > 0 && filteredVerbs.every(v => selectedIds.has(v.id));
 
   const selectAllFiltered = () => {
     setSelectedIds(prev => {
       const next = new Set(prev);
-      filteredPairs.forEach(p => next.add(p.id));
+      filteredVerbs.forEach(v => next.add(v.id));
       return next;
     });
   };
@@ -151,13 +137,13 @@ export function ExportModal({
   const deselectAllFiltered = () => {
     setSelectedIds(prev => {
       const next = new Set(prev);
-      filteredPairs.forEach(p => next.delete(p.id));
+      filteredVerbs.forEach(v => next.delete(v.id));
       return next;
     });
   };
 
   const { exportXlsx, exportCsv } = useExcelExport({
-    wordPairs,
+    wordPairs: [],
     sections,
     level: currentLevel ?? levels[0],
     language,
@@ -171,19 +157,19 @@ export function ExportModal({
     setIsExporting(true);
     setExportError(null);
     try {
-      const selectedPairs = allPairs.filter(p => selectedIds.has(p.id));
+      const selectedVerbs = allVerbs.filter(v => selectedIds.has(v.id));
+      const referencedLevelIds = new Set(selectedVerbs.map(v => v.level_id));
       const referencedSubsectionIds = new Set(
-        selectedPairs.map(p => p.section_id).filter((id): id is number => id !== null)
+        selectedVerbs.map(v => v.section_id).filter((id): id is number => id !== null)
       );
-      const referencedLevelIds = new Set(selectedPairs.map(p => p.level_id));
-      const filteredSubsections = allSubsections.filter(s => referencedSubsectionIds.has(s.id));
       const filteredLevels = levels.filter(l => referencedLevelIds.has(l.id));
+      const filteredSubsections = allSubsections.filter(s => referencedSubsectionIds.has(s.id));
       const payload: ExportPayload = {
-        wordPairs: selectedPairs,
+        wordPairs: [],
         sections: filteredSubsections,
         levels: filteredLevels,
-        fileLabel: filteredLevels.length === 1 ? (filteredLevels[0].name) : language.name,
-        verbs: allVerbs.length > 0 ? allVerbs : undefined,
+        fileLabel: filteredLevels.length === 1 ? filteredLevels[0].name : language.name,
+        verbs: selectedVerbs,
       };
       if (format === 'xlsx') await exportXlsx(payload);
       else await exportCsv(payload);
@@ -194,7 +180,7 @@ export function ExportModal({
     }
   };
 
-  // --- Step 1: Select Sections (levels) ---
+  // Step 1: Select Levels
   if (step === 'select-levels') {
     const footer = (
       <>
@@ -206,7 +192,7 @@ export function ExportModal({
     );
 
     return (
-      <Modal isOpen={isOpen} onClose={onClose} title={t.exportModalTitleCombined} footer={footer}>
+      <Modal isOpen={isOpen} onClose={onClose} title={t.exportVerbs} footer={footer}>
         <div className="flex flex-col gap-3">
           <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.exportScope}</p>
           <div className="flex flex-col gap-1.5">
@@ -227,22 +213,13 @@ export function ExportModal({
               </label>
             ))}
           </div>
-          <hr className="border-gray-200 dark:border-gray-700" />
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={includeVerbs}
-              onChange={() => setIncludeVerbs(v => !v)}
-              className="accent-indigo-500"
-            />
-            <span className="text-sm text-gray-800 dark:text-gray-200">{t.includeVerbs}</span>
-          </label>
         </div>
       </Modal>
     );
   }
 
-  // --- Step 2: Select Pairs ---
+  // Step 2: Select Verbs
+  const showSectionCol = selectedLevelIds.size > 1;
   const footer = (
     <>
       <Button variant="secondary" onClick={() => setStep('select-levels')} disabled={isExporting}>
@@ -254,10 +231,8 @@ export function ExportModal({
     </>
   );
 
-  const showSectionCol = selectedLevelIds.size > 1;
-
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={t.exportModalTitle} footer={footer} size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title={t.exportVerbs} footer={footer} size="lg">
       <div className="flex flex-col gap-3">
         {exportError && (
           <p className="text-xs text-red-600 dark:text-red-400">
@@ -283,49 +258,44 @@ export function ExportModal({
             </button>
             <button
               onClick={deselectAllFiltered}
-              disabled={filteredPairs.every(p => !selectedIds.has(p.id))}
+              disabled={filteredVerbs.every(v => !selectedIds.has(v.id))}
               className="text-xs text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 disabled:opacity-40 disabled:cursor-default"
             >
               {t.exportDeselectAll}
             </button>
           </div>
           <span className="text-xs text-gray-500 dark:text-gray-400">
-            {t.exportSelectedCount(selectedIds.size, allPairs.length)}
+            {t.exportSelectedCount(selectedIds.size, allVerbs.length)}
           </span>
         </div>
 
-        {allVerbs.length > 0 && (
-          <p className="text-xs text-indigo-600 dark:text-indigo-400">
-            {t.verbsIncluded(allVerbs.length)}
-          </p>
-        )}
-
         <div className="overflow-y-auto max-h-72 rounded border border-gray-200 dark:border-gray-700">
-          {filteredPairs.length === 0 ? (
+          {filteredVerbs.length === 0 ? (
             <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6">—</p>
           ) : (
             <table className="w-full text-sm border-collapse">
               <tbody>
-                {filteredPairs.map(pair => {
-                  const subsecName = pair.section_id != null ? subsectionMap.get(pair.section_id) : undefined;
-                  const secName = levelMap.get(pair.level_id);
+                {filteredVerbs.map(verb => {
+                  const subsecName = verb.section_id != null ? subsectionMap.get(verb.section_id) : undefined;
+                  const secName = levelMap.get(verb.level_id);
                   return (
                     <tr
-                      key={pair.id}
+                      key={verb.id}
                       className="border-b border-gray-100 dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
-                      onClick={() => togglePair(pair.id)}
+                      onClick={() => toggleVerb(verb.id)}
                     >
                       <td className="px-3 py-2 w-6">
                         <input
                           type="checkbox"
-                          checked={selectedIds.has(pair.id)}
-                          onChange={() => togglePair(pair.id)}
+                          checked={selectedIds.has(verb.id)}
+                          onChange={() => toggleVerb(verb.id)}
                           onClick={e => e.stopPropagation()}
                           className="accent-indigo-500"
                         />
                       </td>
-                      <td className="px-3 py-2 text-gray-800 dark:text-gray-200">{pair.source}</td>
-                      <td className="px-3 py-2 text-gray-800 dark:text-gray-200">{pair.target}</td>
+                      <td className="px-3 py-2 text-gray-800 dark:text-gray-200">{verb.infinitive_source}</td>
+                      <td className="px-3 py-2 text-gray-800 dark:text-gray-200">{verb.infinitive_target}</td>
+                      <td className="px-3 py-2 text-gray-400 dark:text-gray-500 text-xs">{verb.conjugations.length} {t.forms}</td>
                       {showSectionCol && (
                         <td className="px-3 py-2 text-gray-400 dark:text-gray-500 text-xs">{secName ?? ''}</td>
                       )}

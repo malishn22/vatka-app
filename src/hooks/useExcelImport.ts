@@ -8,6 +8,26 @@ export interface ParsedPair {
   disabled?: boolean;   // hidden state (col E, 'Hidden' = true)
 }
 
+export interface ParsedConjugation {
+  tense: string;
+  person: string;
+  form: string;
+}
+
+export interface ParsedVerb {
+  infinitive_source: string;
+  infinitive_target: string;
+  section?: string;
+  subsection?: string;
+  disabled?: boolean;
+  conjugations: ParsedConjugation[];
+}
+
+export interface ParsedSpreadsheetResult {
+  pairs: ParsedPair[];
+  verbs: ParsedVerb[];
+}
+
 interface HeaderGuard {
   source: string;
   target: string;
@@ -147,18 +167,145 @@ function buildPairsFromRows(rows: string[][], headerGuard?: HeaderGuard): Parsed
   return pairs;
 }
 
+function isVerbCsvHeaders(rows: string[][]): boolean {
+  if (rows.length === 0) return false;
+  const first = rows[0].map(c => (c ?? '').trim().toLowerCase());
+  return first.includes('tense') || first.includes('conjugations');
+}
+
+function buildVerbsFromRows(rows: string[][], headerGuard?: HeaderGuard): ParsedVerb[] {
+  if (rows.length === 0) return [];
+
+  // Detect old JSON format vs new tense-row format
+  const headerRow = rows[0].map(c => (c ?? '').trim().toLowerCase());
+  const isOldJsonFormat = headerRow.includes('conjugations') && !headerRow.includes('tense');
+
+  if (isOldJsonFormat) {
+    return buildVerbsFromRowsJsonLegacy(rows, headerGuard);
+  }
+
+  // New tense-row format: find "section" column position to know where person/form pairs end
+  const sectionColIdx = headerRow.indexOf('section');
+  const secIdx = sectionColIdx >= 0 ? sectionColIdx : undefined;
+
+  // Filter data rows (skip header + empty + guard)
+  const dataRows = rows.filter(row => {
+    const src = String(row[0] ?? '').trim();
+    const tgt = String(row[1] ?? '').trim();
+    if (!src && !tgt) return false;
+    if (src.toLowerCase() === 'source infinitive') return false;
+    if (
+      headerGuard &&
+      src.toLowerCase() === headerGuard.source.toLowerCase() &&
+      tgt.toLowerCase() === headerGuard.target.toLowerCase()
+    ) return false;
+    return true;
+  });
+
+  // Group consecutive rows by (inf_src, inf_tgt)
+  const verbs: ParsedVerb[] = [];
+  let i = 0;
+  while (i < dataRows.length) {
+    const keySrc = String(dataRows[i][0] ?? '').trim();
+    const keyTgt = String(dataRows[i][1] ?? '').trim();
+    const conjugations: ParsedConjugation[] = [];
+
+    // Determine trailing column positions
+    const rowLen = dataRows[i].length;
+    const sectionCol = secIdx ?? Math.max(3, rowLen - 3);
+
+    const section = String(dataRows[i][sectionCol] ?? '').trim();
+    const subsection = String(dataRows[i][sectionCol + 1] ?? '').trim();
+    const hidden = String(dataRows[i][sectionCol + 2] ?? '').trim();
+
+    while (i < dataRows.length) {
+      const src = String(dataRows[i][0] ?? '').trim();
+      const tgt = String(dataRows[i][1] ?? '').trim();
+      if (src !== keySrc || tgt !== keyTgt) break;
+
+      const tense = String(dataRows[i][2] ?? '').trim();
+      // Read conjugation cells from col 3 to sectionCol (each cell is "person - form")
+      let j = 3;
+      while (j < sectionCol) {
+        const cell = String(dataRows[i][j] ?? '').trim();
+        const dashIdx = cell.indexOf(' - ');
+        if (dashIdx >= 0) {
+          const person = cell.substring(0, dashIdx);
+          const form = cell.substring(dashIdx + 3);
+          if (person && form) {
+            conjugations.push({ tense, person, form });
+          }
+        }
+        j++;
+      }
+      i++;
+    }
+
+    verbs.push({
+      infinitive_source: keySrc,
+      infinitive_target: keyTgt,
+      conjugations,
+      ...(section ? { section } : {}),
+      ...(subsection ? { subsection } : {}),
+      ...(hidden.toLowerCase() === 'hidden' ? { disabled: true } : {}),
+    });
+  }
+
+  return verbs;
+}
+
+/** Backward-compatible parser for old JSON conjugation CSV format */
+function buildVerbsFromRowsJsonLegacy(rows: string[][], headerGuard?: HeaderGuard): ParsedVerb[] {
+  const dataRows = rows.filter(row => {
+    const src = String(row[0] ?? '').trim();
+    const tgt = String(row[1] ?? '').trim();
+    if (!src && !tgt) return false;
+    if (src.toLowerCase() === 'source infinitive') return false;
+    if (
+      headerGuard &&
+      src.toLowerCase() === headerGuard.source.toLowerCase() &&
+      tgt.toLowerCase() === headerGuard.target.toLowerCase()
+    ) return false;
+    return true;
+  });
+
+  return dataRows.map(row => {
+    const inf_src = String(row[0] ?? '').trim();
+    const inf_tgt = String(row[1] ?? '').trim();
+    const conjJson = String(row[2] ?? '').trim();
+    const section = String(row[3] ?? '').trim();
+    const subsection = String(row[4] ?? '').trim();
+    const hidden = String(row[5] ?? '').trim();
+
+    let conjugations: ParsedConjugation[] = [];
+    try {
+      conjugations = JSON.parse(conjJson || '[]');
+    } catch { /* ignore */ }
+
+    return {
+      infinitive_source: inf_src,
+      infinitive_target: inf_tgt,
+      conjugations,
+      ...(section ? { section } : {}),
+      ...(subsection ? { subsection } : {}),
+      ...(hidden.toLowerCase() === 'hidden' ? { disabled: true } : {}),
+    };
+  });
+}
+
 /**
- * Reusable hook for importing word pairs from an Excel or CSV file.
+ * Reusable hook for importing word pairs and/or verbs from an Excel or CSV file.
  * Returns a trigger function and props for a hidden file input element.
  *
  * Column format detection:
  * - 4-column: col A = source, col B = target, col C = section (level), col D = subsection
  * - Legacy 3-column: col A = source, col B = target, col C = subsection
+ * - Verb sheets detected by "Conjugations" header
  *
  * If headerGuard is provided, rows matching its source+target values are skipped (header detection).
  */
 export function useExcelImport(
-  onImport: (rows: ParsedPair[]) => void,
+  onImport: (result: ParsedSpreadsheetResult) => void,
   headerGuard?: HeaderGuard,
   onError?: (message: string) => void,
 ) {
@@ -182,7 +329,7 @@ export function useExcelImport(
         const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
 
         if (isTauriRuntime()) {
-          const parsed = await tauriInvoke<ParsedPair[]>('parse_spreadsheet', {
+          const parsed = await tauriInvoke<ParsedSpreadsheetResult>('parse_spreadsheet', {
             bytes: Array.from(bytes),
             filename: file.name,
             header_guard: headerGuard ?? null,
@@ -197,7 +344,11 @@ export function useExcelImport(
         }
         const text = new TextDecoder().decode(bytes);
         const rows = parseCsv(text);
-        onImport(buildPairsFromRows(rows, headerGuard));
+        if (isVerbCsvHeaders(rows)) {
+          onImport({ pairs: [], verbs: buildVerbsFromRows(rows, headerGuard) });
+        } else {
+          onImport({ pairs: buildPairsFromRows(rows, headerGuard), verbs: [] });
+        }
       } catch (err) {
         onError?.(err instanceof Error ? err.message : String(err));
       }

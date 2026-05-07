@@ -4,7 +4,10 @@ import { useDataStore } from '../../store/dataStore';
 import { VerbRow } from './VerbRow';
 import { AddVerbForm } from './AddVerbForm';
 import { EditVerbModal } from './EditVerbModal';
+import { VerbExportModal } from './VerbExportModal';
+import { VerbImportModal } from './VerbImportModal';
 import { Button } from '../shared/Button';
+import { Toast } from '../shared/Toast';
 import { useT } from '../../i18n/useT';
 import type { VerbWithConjugations } from '../../types';
 
@@ -14,10 +17,15 @@ export function VerbsView() {
   const t = useT();
   const [addFormOpen, setAddFormOpen] = useState(false);
   const [editingVerb, setEditingVerb] = useState<VerbWithConjugations | null>(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'xlsx' | 'csv' | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
   const addFormRef = useRef<HTMLDivElement>(null);
 
   const level = levels.find((l) => l.id === selectedLevelId);
   const language = languages.find((l) => l.id === selectedLanguageId);
+  const levelSections = sections.filter((s) => s.level_id === selectedLevelId);
+  const languageLevels = levels.filter((l) => l.language_id === selectedLanguageId);
 
   useEffect(() => {
     if (selectedLevelId !== null) {
@@ -70,6 +78,17 @@ export function VerbsView() {
                 targetLabel={language.target}
                 onAdded={() => setAddFormOpen(false)}
               />
+              <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 flex gap-2">
+                <Button variant="secondary" onClick={() => { setImportModalOpen(true); setAddFormOpen(false); }}>
+                  {t.importVerbs}
+                </Button>
+                <Button variant="secondary" onClick={() => { setExportFormat('xlsx'); setAddFormOpen(false); }} disabled={verbs.length === 0}>
+                  {t.exportExcel}
+                </Button>
+                <Button variant="secondary" onClick={() => { setExportFormat('csv'); setAddFormOpen(false); }} disabled={verbs.length === 0}>
+                  {t.exportCsv}
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -96,6 +115,39 @@ export function VerbsView() {
           onClose={() => setEditingVerb(null)}
         />
       )}
+
+      {language && (
+        <VerbImportModal
+          isOpen={importModalOpen}
+          onClose={() => setImportModalOpen(false)}
+          levelId={level.id}
+          language={language}
+          sections={levelSections}
+          levels={languageLevels}
+          sourceLabel={language.source}
+          targetLabel={language.target}
+          onImported={(count, skipped) => {
+            setImportModalOpen(false);
+            setToastMsg(t.verbsImportResult(count, skipped));
+          }}
+        />
+      )}
+
+      {exportFormat !== null && language && (
+        <VerbExportModal
+          isOpen={exportFormat !== null}
+          onClose={() => setExportFormat(null)}
+          format={exportFormat}
+          language={language}
+          levels={languageLevels}
+          currentLevelId={level.id}
+          sections={levelSections}
+          verbs={verbs}
+          onSuccess={() => setToastMsg(t.exportedSuccessfully)}
+        />
+      )}
+
+      {toastMsg && <Toast message={toastMsg} onDone={() => setToastMsg(null)} />}
     </div>
   );
 }

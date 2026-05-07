@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::Cursor;
 
 use calamine::{DataType, Ods, Reader, Xlsx};
@@ -10,6 +10,7 @@ pub struct HeaderGuard {
   pub source: String,
   pub target: String,
 }
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParsedPair {
@@ -45,6 +46,49 @@ pub struct ExportLevel {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExportConjugation {
+  pub tense: String,
+  pub person: String,
+  pub form: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExportVerb {
+  pub infinitive_source: String,
+  pub infinitive_target: String,
+  pub level_id: i64,
+  pub section_id: Option<i64>,
+  pub disabled: bool,
+  pub conjugations: Vec<ExportConjugation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParsedConjugation {
+  pub tense: String,
+  pub person: String,
+  pub form: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParsedVerb {
+  pub infinitive_source: String,
+  pub infinitive_target: String,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub section: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub subsection: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub disabled: Option<bool>,
+  pub conjugations: Vec<ParsedConjugation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParsedSpreadsheetResult {
+  pub pairs: Vec<ParsedPair>,
+  pub verbs: Vec<ParsedVerb>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportPayload {
   pub word_pairs: Vec<ExportWordPair>,
   pub sections: Vec<ExportSection>,
@@ -52,6 +96,7 @@ pub struct ExportPayload {
   pub file_label: String,
   pub source_label: String,
   pub target_label: String,
+  pub verbs: Option<Vec<ExportVerb>>,
 }
 
 fn eq_guard(source: &str, target: &str, guard: &HeaderGuard) -> bool {
@@ -160,30 +205,34 @@ fn parse_rows(rows: Vec<Vec<String>>, header_guard: Option<HeaderGuard>) -> Vec<
   pairs
 }
 
-fn read_xlsx(bytes: Vec<u8>) -> Result<Vec<Vec<String>>, String> {
+fn read_xlsx_all(bytes: Vec<u8>) -> Result<Vec<(String, Vec<Vec<String>>)>, String> {
   let mut workbook: Xlsx<Cursor<Vec<u8>>> = Xlsx::new(Cursor::new(bytes)).map_err(|e| e.to_string())?;
   let sheet_names = workbook.sheet_names().to_owned();
-  let first = sheet_names.get(0).ok_or_else(|| "Workbook has no sheets".to_string())?.to_string();
-  let range = workbook.worksheet_range(&first).map_err(|e| e.to_string())?;
-
-  let mut out: Vec<Vec<String>> = Vec::new();
-  for row in range.rows() {
-    out.push(row.iter().map(|c| cell_to_string(c)).collect());
+  let mut sheets: Vec<(String, Vec<Vec<String>>)> = Vec::new();
+  for name in sheet_names {
+    let range = workbook.worksheet_range(&name).map_err(|e| e.to_string())?;
+    let mut rows: Vec<Vec<String>> = Vec::new();
+    for row in range.rows() {
+      rows.push(row.iter().map(|c| cell_to_string(c)).collect());
+    }
+    sheets.push((name, rows));
   }
-  Ok(out)
+  Ok(sheets)
 }
 
-fn read_ods(bytes: Vec<u8>) -> Result<Vec<Vec<String>>, String> {
+fn read_ods_all(bytes: Vec<u8>) -> Result<Vec<(String, Vec<Vec<String>>)>, String> {
   let mut workbook: Ods<Cursor<Vec<u8>>> = Ods::new(Cursor::new(bytes)).map_err(|e| e.to_string())?;
   let sheet_names = workbook.sheet_names().to_owned();
-  let first = sheet_names.get(0).ok_or_else(|| "Workbook has no sheets".to_string())?.to_string();
-  let range = workbook.worksheet_range(&first).map_err(|e| e.to_string())?;
-
-  let mut out: Vec<Vec<String>> = Vec::new();
-  for row in range.rows() {
-    out.push(row.iter().map(|c| cell_to_string(c)).collect());
+  let mut sheets: Vec<(String, Vec<Vec<String>>)> = Vec::new();
+  for name in sheet_names {
+    let range = workbook.worksheet_range(&name).map_err(|e| e.to_string())?;
+    let mut rows: Vec<Vec<String>> = Vec::new();
+    for row in range.rows() {
+      rows.push(row.iter().map(|c| cell_to_string(c)).collect());
+    }
+    sheets.push((name, rows));
   }
-  Ok(out)
+  Ok(sheets)
 }
 
 fn read_csv(bytes: Vec<u8>) -> Result<Vec<Vec<String>>, String> {
@@ -200,22 +249,236 @@ fn read_csv(bytes: Vec<u8>) -> Result<Vec<Vec<String>>, String> {
   Ok(out)
 }
 
+fn is_verb_sheet(rows: &[Vec<String>]) -> bool {
+  for row in rows.iter().take(3) {
+    let lower: Vec<String> = row.iter().map(|c| c.trim().to_lowercase()).collect();
+    // New format: "tense" header; old format: "conjugations" header (backward compat)
+    if lower.contains(&"tense".to_string()) || lower.contains(&"conjugations".to_string()) {
+      return true;
+    }
+  }
+  false
+}
+
+fn is_old_json_verb_format(rows: &[Vec<String>]) -> bool {
+  // Old format had "Conjugations" as header in col 2; new format has "Tense"
+  for row in rows.iter().take(3) {
+    let col2 = row.get(2).map(|s| s.trim().to_lowercase()).unwrap_or_default();
+    if col2 == "conjugations" {
+      return true;
+    }
+    if col2 == "tense" {
+      return false;
+    }
+  }
+  false
+}
+
+fn parse_verb_rows(rows: Vec<Vec<String>>, header_guard: &Option<HeaderGuard>) -> Vec<ParsedVerb> {
+  if is_old_json_verb_format(&rows) {
+    return parse_verb_rows_json_legacy(rows, header_guard);
+  }
+
+  // New flat tense-row format:
+  // Col 0: Source Infinitive, Col 1: Target Infinitive, Col 2: Tense
+  // Cols 3..end-3: Person/Form pairs
+  // Last 3 cols: Section, Subsection, Hidden
+
+  // Find the trailing column positions by detecting the header row
+  let mut section_col_offset: Option<usize> = None;
+  for row in rows.iter().take(3) {
+    for (i, cell) in row.iter().enumerate() {
+      if cell.trim().eq_ignore_ascii_case("section") {
+        section_col_offset = Some(i);
+        break;
+      }
+    }
+    if section_col_offset.is_some() { break; }
+  }
+
+  // Collect data rows (skip headers and empty rows)
+  struct TenseRow {
+    inf_src: String,
+    inf_tgt: String,
+    tense: String,
+    pairs: Vec<(String, String)>,
+    section: String,
+    subsection: String,
+    hidden: String,
+  }
+
+  let mut tense_rows: Vec<TenseRow> = Vec::new();
+
+  for row in &rows {
+    let inf_src = row.get(0).map(|s| s.trim()).unwrap_or("").to_string();
+    let inf_tgt = row.get(1).map(|s| s.trim()).unwrap_or("").to_string();
+
+    // Skip header rows
+    if inf_src.eq_ignore_ascii_case("source infinitive") {
+      continue;
+    }
+    if let Some(ref guard) = header_guard {
+      if eq_guard(&inf_src, &inf_tgt, guard) {
+        continue;
+      }
+    }
+    if inf_src.is_empty() && inf_tgt.is_empty() {
+      continue;
+    }
+
+    let tense = row.get(2).map(|s| s.trim()).unwrap_or("").to_string();
+
+    // Determine where section/subsection/hidden are (last 3 meaningful cols)
+    let sec_idx = section_col_offset.unwrap_or_else(|| if row.len() >= 3 { row.len().saturating_sub(3) } else { 3 });
+
+    // Read conjugation cells from col 3 to sec_idx (each cell is "person - form")
+    let mut pairs: Vec<(String, String)> = Vec::new();
+    let mut i = 3;
+    while i < sec_idx && i < row.len() {
+      let cell = row.get(i).map(|s| s.trim()).unwrap_or("");
+      if let Some((person, form)) = cell.split_once(" - ") {
+        pairs.push((person.trim().to_string(), form.trim().to_string()));
+      }
+      i += 1;
+    }
+
+    let section = row.get(sec_idx).map(|s| s.trim()).unwrap_or("").to_string();
+    let subsection = row.get(sec_idx + 1).map(|s| s.trim()).unwrap_or("").to_string();
+    let hidden = row.get(sec_idx + 2).map(|s| s.trim()).unwrap_or("").to_string();
+
+    tense_rows.push(TenseRow { inf_src, inf_tgt, tense, pairs, section, subsection, hidden });
+  }
+
+  // Group tense rows by (inf_src, inf_tgt) to reconstruct verbs
+  let mut verbs: Vec<ParsedVerb> = Vec::new();
+
+  let mut i = 0;
+  while i < tense_rows.len() {
+    let key_src = &tense_rows[i].inf_src;
+    let key_tgt = &tense_rows[i].inf_tgt;
+
+    let section = tense_rows[i].section.clone();
+    let subsection = tense_rows[i].subsection.clone();
+    let hidden = tense_rows[i].hidden.clone();
+
+    let mut conjugations: Vec<ParsedConjugation> = Vec::new();
+
+    // Collect all consecutive rows with the same infinitive pair
+    while i < tense_rows.len() && tense_rows[i].inf_src == *key_src && tense_rows[i].inf_tgt == *key_tgt {
+      let tr = &tense_rows[i];
+      for (person, form) in &tr.pairs {
+        conjugations.push(ParsedConjugation {
+          tense: tr.tense.clone(),
+          person: person.clone(),
+          form: form.clone(),
+        });
+      }
+      i += 1;
+    }
+
+    let disabled = if hidden.eq_ignore_ascii_case("hidden") { Some(true) } else { None };
+
+    verbs.push(ParsedVerb {
+      infinitive_source: key_src.clone(),
+      infinitive_target: key_tgt.clone(),
+      section: if section.is_empty() { None } else { Some(section) },
+      subsection: if subsection.is_empty() { None } else { Some(subsection) },
+      disabled,
+      conjugations,
+    });
+  }
+
+  verbs
+}
+
+/// Backward-compatible parser for old JSON conjugation format
+fn parse_verb_rows_json_legacy(rows: Vec<Vec<String>>, header_guard: &Option<HeaderGuard>) -> Vec<ParsedVerb> {
+  let rows: Vec<Vec<String>> = rows
+    .into_iter()
+    .map(|mut r| {
+      if r.len() < 6 {
+        r.resize(6, "".to_string());
+      }
+      r
+    })
+    .collect();
+
+  let mut verbs: Vec<ParsedVerb> = Vec::new();
+  for row in &rows {
+    let inf_src = row[0].trim().to_string();
+    let inf_tgt = row[1].trim().to_string();
+    let conj_json = row[2].trim().to_string();
+    let section = row[3].trim().to_string();
+    let subsection = row[4].trim().to_string();
+    let hidden_str = row[5].trim().to_string();
+
+    if inf_src.eq_ignore_ascii_case("source infinitive") || inf_src.eq_ignore_ascii_case("conjugations") {
+      continue;
+    }
+    if let Some(ref guard) = header_guard {
+      if eq_guard(&inf_src, &inf_tgt, guard) {
+        continue;
+      }
+    }
+    if inf_src.is_empty() && inf_tgt.is_empty() {
+      continue;
+    }
+
+    let disabled = if hidden_str.eq_ignore_ascii_case("hidden") { Some(true) } else { None };
+
+    // Parse JSON conjugations into structured vec
+    let conjugations: Vec<ParsedConjugation> = if conj_json.is_empty() || conj_json == "[]" {
+      Vec::new()
+    } else {
+      serde_json::from_str::<Vec<ParsedConjugation>>(&conj_json).unwrap_or_default()
+    };
+
+    verbs.push(ParsedVerb {
+      infinitive_source: inf_src,
+      infinitive_target: inf_tgt,
+      conjugations,
+      section: if section.is_empty() { None } else { Some(section) },
+      subsection: if subsection.is_empty() { None } else { Some(subsection) },
+      disabled,
+    });
+  }
+
+  verbs
+}
+
 #[tauri::command]
-pub fn parse_spreadsheet(bytes: Vec<u8>, filename: String, header_guard: Option<HeaderGuard>) -> Result<Vec<ParsedPair>, String> {
+pub fn parse_spreadsheet(bytes: Vec<u8>, filename: String, header_guard: Option<HeaderGuard>) -> Result<ParsedSpreadsheetResult, String> {
   let ext = filename
     .rsplit('.')
     .next()
     .unwrap_or("")
     .to_ascii_lowercase();
 
-  let rows = match ext.as_str() {
-    "xlsx" => read_xlsx(bytes)?,
-    "ods" => read_ods(bytes)?,
-    "csv" => read_csv(bytes)?,
+  let sheets: Vec<(String, Vec<Vec<String>>)> = match ext.as_str() {
+    "xlsx" => read_xlsx_all(bytes)?,
+    "ods" => read_ods_all(bytes)?,
+    "csv" => {
+      let rows = read_csv(bytes)?;
+      vec![("".to_string(), rows)]
+    }
     other => return Err(format!("Unsupported file extension: {other}")),
   };
 
-  Ok(parse_rows(rows, header_guard))
+  let mut all_pairs: Vec<ParsedPair> = Vec::new();
+  let mut all_verbs: Vec<ParsedVerb> = Vec::new();
+
+  for (_name, rows) in sheets {
+    if is_verb_sheet(&rows) {
+      all_verbs.extend(parse_verb_rows(rows, &header_guard));
+    } else {
+      all_pairs.extend(parse_rows(rows, header_guard.clone()));
+    }
+  }
+
+  Ok(ParsedSpreadsheetResult {
+    pairs: all_pairs,
+    verbs: all_verbs,
+  })
 }
 
 fn write_level_sheet(
@@ -284,6 +547,110 @@ pub fn build_xlsx(payload: ExportPayload) -> Result<Vec<u8>, String> {
   } else {
     let name = payload.file_label.chars().take(31).collect::<String>();
     write_level_sheet(&mut workbook, &name, &header, &make_rows(&payload.word_pairs)).map_err(|e| e.to_string())?;
+  }
+
+  // Write verb sheets (one row per tense, with dynamic Person/Form column pairs)
+  if let Some(ref verbs) = payload.verbs {
+    if !verbs.is_empty() {
+      let mut verb_level_ids: Vec<i64> = verbs.iter().map(|v| v.level_id).collect();
+      verb_level_ids.sort();
+      verb_level_ids.dedup();
+
+      let mut used_sheet_names: Vec<String> = Vec::new();
+
+      for lvl_id in &verb_level_ids {
+        let lvl_verbs: Vec<&ExportVerb> = verbs.iter().filter(|v| v.level_id == *lvl_id).collect();
+        let lvl_label = level_map.get(lvl_id).cloned().unwrap_or_else(|| lvl_id.to_string());
+        let mut sheet_name = format!("Verbs - {}", lvl_label).chars().take(31).collect::<String>();
+
+        // Deduplicate sheet names
+        let base = sheet_name.clone();
+        let mut counter = 2u32;
+        while used_sheet_names.contains(&sheet_name) {
+          let suffix = format!(" {counter}");
+          sheet_name = format!("{}{}", &base[..std::cmp::min(base.len(), 31 - suffix.len())], suffix);
+          counter += 1;
+        }
+        used_sheet_names.push(sheet_name.clone());
+
+        // Find max conjugations per tense across all verbs in this level
+        let mut max_conjs: usize = 0;
+        for v in &lvl_verbs {
+          let mut by_tense: BTreeMap<&str, usize> = BTreeMap::new();
+          for c in &v.conjugations {
+            *by_tense.entry(c.tense.as_str()).or_insert(0) += 1;
+          }
+          for count in by_tense.values() {
+            if *count > max_conjs {
+              max_conjs = *count;
+            }
+          }
+        }
+
+        // Build header: each conjugation is a single column ("person - form")
+        let mut header: Vec<String> = vec![
+          "Source Infinitive".to_string(),
+          "Target Infinitive".to_string(),
+          "Tense".to_string(),
+        ];
+        for i in 1..=max_conjs {
+          header.push(format!("Person/Form {i}"));
+        }
+        header.push("Section".to_string());
+        header.push("Subsection".to_string());
+        header.push("Hidden".to_string());
+
+        let total_cols = header.len();
+
+        // Build rows
+        let mut rows: Vec<Vec<String>> = Vec::new();
+        for v in &lvl_verbs {
+          let sec = level_map.get(&v.level_id).cloned().unwrap_or_default();
+          let sub = v.section_id.and_then(|id| section_map.get(&id).cloned()).unwrap_or_default();
+          let hidden = if v.disabled { "Hidden".to_string() } else { "Shown".to_string() };
+
+          if v.conjugations.is_empty() {
+            let mut row = vec![
+              v.infinitive_source.clone(),
+              v.infinitive_target.clone(),
+              String::new(), // empty tense
+            ];
+            // Pad person/form columns
+            row.resize(total_cols - 3, String::new());
+            row.push(sec);
+            row.push(sub);
+            row.push(hidden);
+            rows.push(row);
+          } else {
+            // Group conjugations by tense, preserving order
+            let mut by_tense: BTreeMap<String, Vec<(&str, &str)>> = BTreeMap::new();
+            for c in &v.conjugations {
+              by_tense.entry(c.tense.clone()).or_default().push((c.person.as_str(), c.form.as_str()));
+            }
+            for (tense, pairs) in &by_tense {
+              let mut row = vec![
+                v.infinitive_source.clone(),
+                v.infinitive_target.clone(),
+                tense.clone(),
+              ];
+              for (person, form) in pairs {
+                row.push(format!("{} - {}", person, form));
+              }
+              // Pad to match total columns
+              while row.len() < total_cols - 3 {
+                row.push(String::new());
+              }
+              row.push(sec.clone());
+              row.push(sub.clone());
+              row.push(hidden.clone());
+              rows.push(row);
+            }
+          }
+        }
+
+        write_level_sheet(&mut workbook, &sheet_name, &header, &rows).map_err(|e| e.to_string())?;
+      }
+    }
   }
 
   // Ensure at least one sheet exists.

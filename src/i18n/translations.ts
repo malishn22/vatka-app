@@ -184,6 +184,21 @@ export const translations = {
     fillPersons: 'Fill persons',
     verbAlreadyExists: 'This verb already exists in this language.',
 
+    // Verb export/import
+    includeVerbs: 'Include verb conjugations',
+    verbsIncluded: (n: number) => `${n} verb${n !== 1 ? 's' : ''} will be included`,
+    exportVerbs: 'Export Verbs',
+    importVerbs: 'Import Verbs',
+    noVerbsToExport: 'No verbs to export',
+    verbsImportResult: (count: number, skipped: number) =>
+      skipped > 0
+        ? `Imported ${count} verbs, ${skipped} skipped (duplicates)`
+        : `Imported ${count} verbs`,
+    importVerbPreviewTitle: (n: number) => `Preview — ${n} verbs`,
+    importVerbToImport: (n: number) => `Import ${n} verbs`,
+    exportModalTitleCombined: 'Export Data',
+    csvVerbsOnly: 'CSV can only export one type at a time',
+
     // Conjugation play mode
     conjugationMode: 'Conjugation',
     conjugationModeDesc: 'Practice verb conjugation forms',
@@ -403,6 +418,21 @@ export const translations = {
     addAtLeastOneConjugation: 'En az bir çekim ekleyin',
     fillPersons: 'Kişileri doldur',
     verbAlreadyExists: 'Bu fiil bu dilde zaten mevcut.',
+
+    // Verb export/import
+    includeVerbs: 'Fiil çekimlerini dahil et',
+    verbsIncluded: (n: number) => `${n} fiil dahil edilecek`,
+    exportVerbs: 'Fiilleri Dışa Aktar',
+    importVerbs: 'Fiilleri İçe Aktar',
+    noVerbsToExport: 'Dışa aktarılacak fiil yok',
+    verbsImportResult: (count: number, skipped: number) =>
+      skipped > 0
+        ? `${count} fiil içe aktarıldı, ${skipped} atlandı (tekrar)`
+        : `${count} fiil içe aktarıldı`,
+    importVerbPreviewTitle: (n: number) => `Önizleme — ${n} fiil`,
+    importVerbToImport: (n: number) => `${n} fiil içe aktar`,
+    exportModalTitleCombined: 'Verileri Dışa Aktar',
+    csvVerbsOnly: 'CSV aynı anda yalnızca bir tür dışa aktarabilir',
 
     // Conjugation play mode
     conjugationMode: 'Çekim',
