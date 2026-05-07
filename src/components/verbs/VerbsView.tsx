@@ -10,7 +10,7 @@ import type { VerbWithConjugations } from '../../types';
 
 export function VerbsView() {
   const { selectedLevelId, selectedSectionId, selectedLanguageId } = useUIStore();
-  const { levels, languages, verbs, fetchVerbs } = useDataStore();
+  const { levels, languages, verbs, sections, fetchVerbs } = useDataStore();
   const t = useT();
   const [addFormOpen, setAddFormOpen] = useState(false);
   const [editingVerb, setEditingVerb] = useState<VerbWithConjugations | null>(null);
@@ -42,6 +42,7 @@ export function VerbsView() {
   const displayedVerbs = selectedSectionId !== null
     ? verbs.filter((v) => v.section_id === selectedSectionId)
     : verbs;
+  const showSection = selectedSectionId === null;
 
   if (!level) return null;
 
@@ -81,7 +82,7 @@ export function VerbsView() {
       ) : (
         <div className="flex flex-col gap-2">
           {displayedVerbs.map((verb) => (
-            <VerbRow key={verb.id} verb={verb} onEdit={setEditingVerb} />
+            <VerbRow key={verb.id} verb={verb} onEdit={setEditingVerb} showSection={showSection} sectionName={sections.find((s) => s.id === verb.section_id)?.name} />
           ))}
         </div>
       )}

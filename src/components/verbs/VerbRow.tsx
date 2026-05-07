@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useDataStore } from '../../store/dataStore';
+import { useDragContext } from '../../context/DragContext';
+import { useDragSource } from '../../hooks/useDragSource';
 import { Button } from '../shared/Button';
 import { useT } from '../../i18n/useT';
 import { PencilIcon, TrashIcon, EyeIcon, EyeOffIcon, ChevronDownIcon, ChevronRightIcon } from '../shared/Icons';
@@ -8,10 +10,14 @@ import type { VerbWithConjugations } from '../../types';
 interface VerbRowProps {
   verb: VerbWithConjugations;
   onEdit: (verb: VerbWithConjugations) => void;
+  showSection?: boolean;
+  sectionName?: string;
 }
 
-export function VerbRow({ verb, onEdit }: VerbRowProps) {
+export function VerbRow({ verb, onEdit, showSection, sectionName }: VerbRowProps) {
   const { deleteVerb, toggleVerbDisabled } = useDataStore();
+  const { draggingVerbId, setDraggingVerbId } = useDragContext();
+  const { dragProps, dragSourceClass } = useDragSource({ id: verb.id, setDraggingId: setDraggingVerbId, isDragging: draggingVerbId === verb.id });
   const t = useT();
   const [expanded, setExpanded] = useState(false);
 
@@ -27,10 +33,11 @@ export function VerbRow({ verb, onEdit }: VerbRowProps) {
   const tenseNames = Object.keys(tenseGroups);
 
   return (
-    <div className={`border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden ${isDisabled ? 'opacity-40' : ''}`}>
+    <div className={`border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden ${isDisabled ? 'opacity-40' : ''} ${dragSourceClass}`}>
       {/* Header */}
       <div
-        className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 group"
+        {...dragProps}
+        className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-800 cursor-grab hover:bg-gray-50 dark:hover:bg-gray-700 group"
         onClick={() => setExpanded(!expanded)}
       >
         <span className="text-gray-400">
@@ -47,6 +54,11 @@ export function VerbRow({ verb, onEdit }: VerbRowProps) {
           <span className="text-xs text-gray-400 dark:text-gray-500 ml-3">
             {tenseNames.length} {tenseNames.length === 1 ? t.tense : t.tenses} &middot; {verb.conjugations.length} {t.forms}
           </span>
+          {showSection && (
+            <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">
+              &middot; {sectionName ?? '—'}
+            </span>
+          )}
         </div>
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
           <Button

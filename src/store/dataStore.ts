@@ -46,6 +46,7 @@ interface DataState {
   deleteVerb: (id: number) => Promise<void>;
   toggleVerbDisabled: (id: number) => Promise<void>;
   verbExistsInLanguage: (languageId: number, infinitiveSource: string, infinitiveTarget: string) => Promise<boolean>;
+  moveVerb: (id: number, levelId: number, sectionId: number | null) => Promise<void>;
   fetchUsedTenses: (languageId: number) => Promise<string[]>;
   fetchUsedPersons: (languageId: number) => Promise<string[]>;
 }
@@ -391,6 +392,16 @@ export const useDataStore = create<DataState>((set, get) => ({
     } catch {
       return false;
     }
+  },
+
+  moveVerb: async (id, levelId, sectionId) => {
+    const verb = get().verbs.find((v) => v.id === id);
+    if (!verb) return;
+    await dbExecute(
+      'UPDATE verbs SET level_id = ?, section_id = ? WHERE id = ?',
+      [levelId, sectionId, id]
+    );
+    await get().fetchVerbs(levelId);
   },
 
   fetchUsedTenses: async (languageId) => {

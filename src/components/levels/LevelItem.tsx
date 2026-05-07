@@ -21,8 +21,8 @@ interface LevelItemProps {
 
 export function LevelItem({ level, onLevelDrop }: LevelItemProps) {
   const { selectedLevelId, setSelectedLevel, setSelectedSection, setView } = useUIStore();
-  const { deleteLevel, fetchSections, sections, wordPairs, updateWordPair, reorderSections, moveSection } = useDataStore();
-  const { draggingPairId, setDraggingPairId, draggingSectionId, setDraggingSectionId, draggingLevelId, setDraggingLevelId } = useDragContext();
+  const { deleteLevel, fetchSections, sections, wordPairs, verbs, updateWordPair, moveVerb, reorderSections, moveSection } = useDataStore();
+  const { draggingPairId, setDraggingPairId, draggingVerbId, setDraggingVerbId, draggingSectionId, setDraggingSectionId, draggingLevelId, setDraggingLevelId } = useDragContext();
   const t = useT();
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
@@ -41,7 +41,12 @@ export function LevelItem({ level, onLevelDrop }: LevelItemProps) {
     ? sections.find((s) => s.id === draggingSectionId)?.level_id === level.id
     : false;
 
+  // Look up dragged verb's current location
+  const draggedVerb = draggingVerbId !== null ? verbs.find((v) => v.id === draggingVerbId) : null;
+  const verbBelongsToThisLevel = draggedVerb?.level_id === level.id;
+
   const canAcceptPairDrop = draggingPairId !== null && (!pairBelongsToThisLevel || draggedPair?.section_id != null);
+  const canAcceptVerbDrop = draggingVerbId !== null && (!verbBelongsToThisLevel || draggedVerb?.section_id != null);
 
   const { dragProps, dragSourceClass } = useDragSource({
     id: level.id,
@@ -58,6 +63,16 @@ export function LevelItem({ level, onLevelDrop }: LevelItemProps) {
           if (draggingPairId !== null) {
             await updateWordPair(draggingPairId, { level_id: level.id, section_id: null });
             setDraggingPairId(null);
+          }
+        },
+      },
+      {
+        canAccept: canAcceptVerbDrop,
+        mode: 'content',
+        onDrop: async () => {
+          if (draggingVerbId !== null) {
+            await moveVerb(draggingVerbId, level.id, null);
+            setDraggingVerbId(null);
           }
         },
       },
@@ -83,7 +98,7 @@ export function LevelItem({ level, onLevelDrop }: LevelItemProps) {
         },
       },
     ],
-    showDashedHint: canAcceptPairDrop,
+    showDashedHint: canAcceptPairDrop || canAcceptVerbDrop,
   });
 
   useEffect(() => {
@@ -172,7 +187,7 @@ export function LevelItem({ level, onLevelDrop }: LevelItemProps) {
         {expanded && (
           <div className="pl-4 flex flex-col gap-0.5 mt-0.5">
             {levelSections.map((section) => (
-              <SectionItem key={section.id} section={section} onSectionDrop={handleSectionDrop} currentPairSectionId={draggedPair?.section_id} />
+              <SectionItem key={section.id} section={section} onSectionDrop={handleSectionDrop} currentPairSectionId={draggedPair?.section_id} currentVerbSectionId={draggedVerb?.section_id} />
             ))}
             <Button
               variant="icon"

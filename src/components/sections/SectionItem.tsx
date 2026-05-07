@@ -15,12 +15,13 @@ interface SectionItemProps {
   section: Section;
   onSectionDrop?: (targetSectionId: number, position: 'above' | 'below') => void;
   currentPairSectionId?: number | null;
+  currentVerbSectionId?: number | null;
 }
 
-export function SectionItem({ section, onSectionDrop, currentPairSectionId }: SectionItemProps) {
+export function SectionItem({ section, onSectionDrop, currentPairSectionId, currentVerbSectionId }: SectionItemProps) {
   const { selectedSectionId, setSelectedLevel, setSelectedSection, setView } = useUIStore();
-  const { deleteSection, updateWordPair, sections } = useDataStore();
-  const { draggingPairId, setDraggingPairId, draggingSectionId, setDraggingSectionId } = useDragContext();
+  const { deleteSection, updateWordPair, moveVerb, sections } = useDataStore();
+  const { draggingPairId, setDraggingPairId, draggingVerbId, setDraggingVerbId, draggingSectionId, setDraggingSectionId } = useDragContext();
   const t = useT();
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
@@ -28,6 +29,7 @@ export function SectionItem({ section, onSectionDrop, currentPairSectionId }: Se
   const isSelected = selectedSectionId === section.id;
   const draggedSection = draggingSectionId !== null ? sections.find(s => s.id === draggingSectionId) : null;
   const canAcceptPairDrop = draggingPairId !== null && currentPairSectionId !== section.id;
+  const canAcceptVerbDrop = draggingVerbId !== null && currentVerbSectionId !== section.id;
 
   const { dragProps, dragSourceClass } = useDragSource({
     id: section.id,
@@ -48,6 +50,16 @@ export function SectionItem({ section, onSectionDrop, currentPairSectionId }: Se
         },
       },
       {
+        canAccept: canAcceptVerbDrop,
+        mode: 'content',
+        onDrop: async () => {
+          if (draggingVerbId !== null) {
+            await moveVerb(draggingVerbId, section.level_id, section.id);
+            setDraggingVerbId(null);
+          }
+        },
+      },
+      {
         canAccept: draggedSection != null && draggedSection.id !== section.id,
         mode: 'reorder',
         onDrop: (position) => {
@@ -56,7 +68,7 @@ export function SectionItem({ section, onSectionDrop, currentPairSectionId }: Se
         },
       },
     ],
-    showDashedHint: canAcceptPairDrop,
+    showDashedHint: canAcceptPairDrop || canAcceptVerbDrop,
   });
 
   const handleSelect = () => {
