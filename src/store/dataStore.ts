@@ -397,11 +397,12 @@ export const useDataStore = create<DataState>((set, get) => ({
   moveVerb: async (id, levelId, sectionId) => {
     const verb = get().verbs.find((v) => v.id === id);
     if (!verb) return;
+    const sourceLevelId = verb.level_id;
     await dbExecute(
       'UPDATE verbs SET level_id = ?, section_id = ? WHERE id = ?',
       [levelId, sectionId, id]
     );
-    await get().fetchVerbs(levelId);
+    await get().fetchVerbs(sourceLevelId);
   },
 
   fetchUsedTenses: async (languageId) => {
