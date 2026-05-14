@@ -65,8 +65,8 @@ export function WordPairRow({ pair, showSection, sections }: WordPairRowProps) {
         )}
         <td className="px-4 py-2 text-right">
           <div className="flex gap-2 justify-end">
-            <Button variant="text" textColor="green" size="xs" onClick={handleSave}>{t.save}</Button>
-            <Button variant="text" textColor="default" size="xs" onClick={handleCancel}>{t.cancel}</Button>
+            <Button variant="primary" size="sm" onClick={handleSave}>{t.save}</Button>
+            <Button variant="secondary" size="sm" onClick={handleCancel}>{t.cancel}</Button>
           </div>
         </td>
       </tr>
