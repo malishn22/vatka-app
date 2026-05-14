@@ -12,7 +12,7 @@ function App() {
   const { currentView } = useUIStore();
 
   useEffect(() => {
-    runMigrations();
+    runMigrations().catch(console.error);
   }, []);
 
   return (

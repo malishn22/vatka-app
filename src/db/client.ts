@@ -1,13 +1,16 @@
 import Database from '@tauri-apps/plugin-sql';
 
-let _db: Database | null = null;
+let _dbPromise: Promise<Database> | null = null;
 
-export async function getDb(): Promise<Database> {
-  if (!_db) {
-    _db = await Database.load('sqlite:wordapp.db');
+export function getDb(): Promise<Database> {
+  if (!_dbPromise) {
+    _dbPromise = Database.load('sqlite:wordapp.db');
   }
-  return _db;
+  return _dbPromise;
 }
+
+let _resolveReady!: () => void;
+export const dbReadyPromise = new Promise<void>((res) => { _resolveReady = res; });
 
 export async function dbSelect<T>(sql: string, params: unknown[] = []): Promise<T[]> {
   const db = await getDb();
@@ -87,4 +90,5 @@ export async function runMigrations(): Promise<void> {
   } catch (e) {
     console.error('Conjugations table migration failed:', e);
   }
+  _resolveReady();
 }

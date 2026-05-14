@@ -5,6 +5,7 @@ import { Button } from '../shared/Button';
 import { Dropdown } from '../shared/Dropdown';
 import { SectionedLevelList } from '../sections/SectionedLevelList';
 import { useT } from '../../i18n/useT';
+import { dbReadyPromise } from '../../db/client';
 
 export function Sidebar() {
   const { selectedLanguageId, setSelectedLanguage, setView, currentView } = useUIStore();
@@ -12,7 +13,7 @@ export function Sidebar() {
   const t = useT();
 
   useEffect(() => {
-    fetchLanguages();
+    dbReadyPromise.then(() => fetchLanguages());
   }, []);
 
   useEffect(() => {
