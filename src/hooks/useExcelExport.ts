@@ -60,8 +60,7 @@ export async function fetchVerbsRaw(levelId: number): Promise<VerbWithConjugatio
 
 export function useExcelExport({ wordPairs, sections, level, language, onSuccess }: UseExcelExportArgs) {
   const safeFilename = (label: string, ext: string) => {
-    const raw = `${language.name}_${label}`;
-    return raw.replace(/[/\\:*?"<>|]/g, '').replace(/\s+/g, '_') + `.${ext}`;
+    return label.replace(/[/\\:*?"<>|]/g, '').replace(/\s+/g, '_') + `.${ext}`;
   };
 
   const exportXlsx = async (payload?: ExportPayload) => {
