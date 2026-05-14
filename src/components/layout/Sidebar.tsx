@@ -24,7 +24,7 @@ export function Sidebar() {
   return (
     <aside className="w-64 flex-shrink-0 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-        <h1 className="text-lg font-bold text-indigo-700 dark:text-indigo-400 mb-3">VatkaApp</h1>
+        <h1 className="text-lg font-bold text-indigo-700 dark:text-indigo-400 mb-3">Vatka</h1>
         <Dropdown
           className="w-full"
           options={languages.map((l) => ({ value: String(l.id), label: l.name }))}

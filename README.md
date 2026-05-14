@@ -1,4 +1,4 @@
-# VatkaApp
+# Vatka
 
 A desktop application for learning languages through word pairs and verb conjugations. Built with Tauri v2.
 

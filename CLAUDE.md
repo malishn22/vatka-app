@@ -1,4 +1,4 @@
-# VatkaApp
+# Vatka
 
 Tauri v2 desktop app for language learning — word pairs and verb conjugations.
 
@@ -47,7 +47,7 @@ src/                          # React frontend
 src-tauri/                    # Rust backend
   src/lib.rs                  # App init, SQLite setup, Tauri commands
   src/spreadsheet.rs          # Spreadsheet import/export (XLSX, ODS, CSV)
-  tauri.conf.json             # App config (productName: VatkaApp, dev port 1420)
+  tauri.conf.json             # App config (productName: Vatka, dev port 1420)
   capabilities/default.json   # Security permissions
 ```
 
