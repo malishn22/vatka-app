@@ -2,34 +2,51 @@ import { createContext, useContext, useState } from 'react';
 import type { ReactNode } from 'react';
 
 interface DragContextValue {
-  draggingPairId: number | null;
-  setDraggingPairId: (id: number | null) => void;
-  draggingVerbId: number | null;
-  setDraggingVerbId: (id: number | null) => void;
+  draggingPairIds: number[];
+  setDraggingPairIds: (ids: number[]) => void;
+  draggingVerbIds: number[];
+  setDraggingVerbIds: (ids: number[]) => void;
   draggingSectionId: number | null;
   setDraggingSectionId: (id: number | null) => void;
   draggingLevelId: number | null;
   setDraggingLevelId: (id: number | null) => void;
+  selectedPairIds: number[];
+  setSelectedPairIds: (ids: number[]) => void;
+  selectedVerbIds: number[];
+  setSelectedVerbIds: (ids: number[]) => void;
 }
 
 const DragContext = createContext<DragContextValue>({
-  draggingPairId: null,
-  setDraggingPairId: () => {},
-  draggingVerbId: null,
-  setDraggingVerbId: () => {},
+  draggingPairIds: [],
+  setDraggingPairIds: () => {},
+  draggingVerbIds: [],
+  setDraggingVerbIds: () => {},
   draggingSectionId: null,
   setDraggingSectionId: () => {},
   draggingLevelId: null,
   setDraggingLevelId: () => {},
+  selectedPairIds: [],
+  setSelectedPairIds: () => {},
+  selectedVerbIds: [],
+  setSelectedVerbIds: () => {},
 });
 
 export function DragProvider({ children }: { children: ReactNode }) {
-  const [draggingPairId, setDraggingPairId] = useState<number | null>(null);
-  const [draggingVerbId, setDraggingVerbId] = useState<number | null>(null);
+  const [draggingPairIds, setDraggingPairIds] = useState<number[]>([]);
+  const [draggingVerbIds, setDraggingVerbIds] = useState<number[]>([]);
   const [draggingSectionId, setDraggingSectionId] = useState<number | null>(null);
   const [draggingLevelId, setDraggingLevelId] = useState<number | null>(null);
+  const [selectedPairIds, setSelectedPairIds] = useState<number[]>([]);
+  const [selectedVerbIds, setSelectedVerbIds] = useState<number[]>([]);
   return (
-    <DragContext.Provider value={{ draggingPairId, setDraggingPairId, draggingVerbId, setDraggingVerbId, draggingSectionId, setDraggingSectionId, draggingLevelId, setDraggingLevelId }}>
+    <DragContext.Provider value={{
+      draggingPairIds, setDraggingPairIds,
+      draggingVerbIds, setDraggingVerbIds,
+      draggingSectionId, setDraggingSectionId,
+      draggingLevelId, setDraggingLevelId,
+      selectedPairIds, setSelectedPairIds,
+      selectedVerbIds, setSelectedVerbIds,
+    }}>
       {children}
     </DragContext.Provider>
   );

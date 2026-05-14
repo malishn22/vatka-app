@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useUIStore } from '../../store/uiStore';
 import { useDataStore } from '../../store/dataStore';
+import { useDragContext } from '../../context/DragContext';
 import { VerbRow } from './VerbRow';
 import { AddVerbForm } from './AddVerbForm';
 import { EditVerbModal } from './EditVerbModal';
@@ -14,6 +15,7 @@ import type { VerbWithConjugations } from '../../types';
 export function VerbsView() {
   const { selectedLevelId, selectedSectionId, selectedLanguageId } = useUIStore();
   const { levels, languages, verbs, sections, fetchVerbs } = useDataStore();
+  const { selectedVerbIds, setSelectedVerbIds } = useDragContext();
   const t = useT();
   const [addFormOpen, setAddFormOpen] = useState(false);
   const [editingVerb, setEditingVerb] = useState<VerbWithConjugations | null>(null);
@@ -21,6 +23,18 @@ export function VerbsView() {
   const [exportFormat, setExportFormat] = useState<'xlsx' | 'csv' | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const addFormRef = useRef<HTMLDivElement>(null);
+
+  const handleToggleVerbSelect = (id: number, additive: boolean) => {
+    if (additive) {
+      setSelectedVerbIds(
+        selectedVerbIds.includes(id)
+          ? selectedVerbIds.filter((x) => x !== id)
+          : [...selectedVerbIds, id]
+      );
+    } else {
+      setSelectedVerbIds(selectedVerbIds.length === 1 && selectedVerbIds[0] === id ? [] : [id]);
+    }
+  };
 
   const level = levels.find((l) => l.id === selectedLevelId);
   const language = languages.find((l) => l.id === selectedLanguageId);
@@ -57,9 +71,19 @@ export function VerbsView() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          {displayedVerbs.length} {displayedVerbs.length !== 1 ? t.verbs : t.verb}
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {displayedVerbs.length} {displayedVerbs.length !== 1 ? t.verbs : t.verb}
+          </p>
+          {selectedVerbIds.length >= 2 && (
+            <button
+              onClick={() => setSelectedVerbIds([])}
+              className="text-xs bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors"
+            >
+              {selectedVerbIds.length} selected ×
+            </button>
+          )}
+        </div>
         <div className="relative" ref={addFormRef}>
           <Button
             variant="secondary"
@@ -101,7 +125,15 @@ export function VerbsView() {
       ) : (
         <div className="flex flex-col gap-2">
           {displayedVerbs.map((verb) => (
-            <VerbRow key={verb.id} verb={verb} onEdit={setEditingVerb} showSection={showSection} sectionName={sections.find((s) => s.id === verb.section_id)?.name} />
+            <VerbRow
+              key={verb.id}
+              verb={verb}
+              onEdit={setEditingVerb}
+              showSection={showSection}
+              sectionName={sections.find((s) => s.id === verb.section_id)?.name}
+              isSelected={selectedVerbIds.includes(verb.id)}
+              onToggleSelect={(additive) => handleToggleVerbSelect(verb.id, additive)}
+            />
           ))}
         </div>
       )}

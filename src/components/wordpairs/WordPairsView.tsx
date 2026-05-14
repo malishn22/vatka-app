@@ -4,6 +4,7 @@ import { useDataStore } from '../../store/dataStore';
 import { usePlayStore } from '../../store/playStore';
 import { useQuizStore } from '../../store/quizStore';
 import { useConjugationPlayStore } from '../../store/conjugationPlayStore';
+import { useDragContext } from '../../context/DragContext';
 import { WordPairRow } from './WordPairRow';
 import { AddWordPairForm } from './AddWordPairForm';
 import { VerbsView } from '../verbs/VerbsView';
@@ -21,6 +22,7 @@ export function WordPairsView() {
   const { initGame } = usePlayStore();
   const { initQuiz } = useQuizStore();
   const { initConjugationPlay } = useConjugationPlayStore();
+  const { selectedPairIds, setSelectedPairIds } = useDragContext();
   const t = useT();
   const [addFormOpen, setAddFormOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -28,6 +30,18 @@ export function WordPairsView() {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [playModalOpen, setPlayModalOpen] = useState(false);
   const addFormRef = useRef<HTMLDivElement>(null);
+
+  const handleTogglePairSelect = (id: number, additive: boolean) => {
+    if (additive) {
+      setSelectedPairIds(
+        selectedPairIds.includes(id)
+          ? selectedPairIds.filter((x) => x !== id)
+          : [...selectedPairIds, id]
+      );
+    } else {
+      setSelectedPairIds(selectedPairIds.length === 1 && selectedPairIds[0] === id ? [] : [id]);
+    }
+  };
 
   useEffect(() => {
     function handleMouseDown(e: MouseEvent) {
@@ -157,9 +171,19 @@ export function WordPairsView() {
       {contentTab === 'wordpairs' ? (
         <>
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {displayedPairs.length} {displayedPairs.length !== 1 ? t.wordPairs : t.wordPair}
-            </p>
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {displayedPairs.length} {displayedPairs.length !== 1 ? t.wordPairs : t.wordPair}
+              </p>
+              {selectedPairIds.length >= 2 && (
+                <button
+                  onClick={() => setSelectedPairIds([])}
+                  className="text-xs bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors"
+                >
+                  {selectedPairIds.length} selected ×
+                </button>
+              )}
+            </div>
             <div className="relative" ref={addFormRef}>
               <Button
                 variant="secondary"
@@ -217,7 +241,14 @@ export function WordPairsView() {
                 </thead>
                 <tbody>
                   {displayedPairs.map((pair) => (
-                    <WordPairRow key={pair.id} pair={pair} showSection={selectedSectionId === null} sections={sections} />
+                    <WordPairRow
+                      key={pair.id}
+                      pair={pair}
+                      showSection={selectedSectionId === null}
+                      sections={sections}
+                      isSelected={selectedPairIds.includes(pair.id)}
+                      onToggleSelect={(additive) => handleTogglePairSelect(pair.id, additive)}
+                    />
                   ))}
                 </tbody>
               </table>

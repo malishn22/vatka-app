@@ -1,7 +1,7 @@
 import { useState } from 'react';
+import type React from 'react';
 import { useDataStore } from '../../store/dataStore';
 import { useDragContext } from '../../context/DragContext';
-import { useDragSource } from '../../hooks/useDragSource';
 import { Button } from '../shared/Button';
 import { useT } from '../../i18n/useT';
 import { PencilIcon, TrashIcon, EyeIcon, EyeOffIcon, ChevronDownIcon, ChevronRightIcon } from '../shared/Icons';
@@ -13,18 +13,18 @@ interface VerbRowProps {
   onEdit: (verb: VerbWithConjugations) => void;
   showSection?: boolean;
   sectionName?: string;
+  isSelected?: boolean;
+  onToggleSelect?: (additive: boolean) => void;
 }
 
-export function VerbRow({ verb, onEdit, showSection, sectionName }: VerbRowProps) {
+export function VerbRow({ verb, onEdit, showSection, sectionName, isSelected = false, onToggleSelect }: VerbRowProps) {
   const { deleteVerb, toggleVerbDisabled } = useDataStore();
-  const { draggingVerbId, setDraggingVerbId } = useDragContext();
-  const { dragProps, dragSourceClass } = useDragSource({ id: verb.id, setDraggingId: setDraggingVerbId, isDragging: draggingVerbId === verb.id });
+  const { draggingVerbIds, setDraggingVerbIds, selectedVerbIds, setSelectedVerbIds } = useDragContext();
   const t = useT();
   const [expanded, setExpanded] = useState(false);
 
   const isDisabled = Boolean(verb.disabled);
 
-  // Group conjugations by tense
   const tenseGroups = verb.conjugations.reduce<Record<string, { person: string; form: string }[]>>((acc, c) => {
     if (!acc[c.tense]) acc[c.tense] = [];
     acc[c.tense].push({ person: c.person, form: c.form });
@@ -33,13 +33,49 @@ export function VerbRow({ verb, onEdit, showSection, sectionName }: VerbRowProps
 
   const tenseNames = Object.keys(tenseGroups);
 
+  const isPartOfDrag = draggingVerbIds.length > 0 && (draggingVerbIds.includes(verb.id) || isSelected);
+
+  const dragProps = {
+    draggable: true as const,
+    onDragStart: (e: React.DragEvent) => {
+      e.dataTransfer.effectAllowed = 'move';
+      const ids = selectedVerbIds.includes(verb.id) ? selectedVerbIds : [verb.id];
+      if (!selectedVerbIds.includes(verb.id)) {
+        setSelectedVerbIds([verb.id]);
+      }
+      setDraggingVerbIds(ids);
+      e.dataTransfer.setData('text/plain', JSON.stringify(ids));
+    },
+    onDragEnd: () => {
+      setDraggingVerbIds([]);
+    },
+  };
+
+  const handleHeaderClick = (e: React.MouseEvent) => {
+    if (e.metaKey || e.ctrlKey) {
+      e.stopPropagation();
+      onToggleSelect?.(true);
+    } else {
+      setExpanded(!expanded);
+    }
+  };
+
   return (
-    <div className={`border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden ${isDisabled ? 'opacity-40' : ''} ${dragSourceClass}`}>
+    <div
+      className={`rounded-lg overflow-hidden
+        ${isDisabled ? 'opacity-40' : ''}
+        ${isPartOfDrag ? 'opacity-50' : ''}
+        ${isSelected
+          ? 'ring-2 ring-indigo-400 border border-indigo-400'
+          : 'border border-gray-200 dark:border-gray-700'
+        }
+      `}
+    >
       {/* Header */}
       <div
         {...dragProps}
         className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-800 cursor-grab hover:bg-gray-50 dark:hover:bg-gray-700 group"
-        onClick={() => setExpanded(!expanded)}
+        onClick={handleHeaderClick}
       >
         <span className="text-gray-400">
           {expanded ? <ChevronDownIcon /> : <ChevronRightIcon />}

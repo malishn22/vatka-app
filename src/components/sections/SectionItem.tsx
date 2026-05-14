@@ -14,22 +14,20 @@ import { PencilIcon, TrashIcon } from '../shared/Icons';
 interface SectionItemProps {
   section: Section;
   onSectionDrop?: (targetSectionId: number, position: 'above' | 'below') => void;
-  currentPairSectionId?: number | null;
-  currentVerbSectionId?: number | null;
 }
 
-export function SectionItem({ section, onSectionDrop, currentPairSectionId, currentVerbSectionId }: SectionItemProps) {
+export function SectionItem({ section, onSectionDrop }: SectionItemProps) {
   const { selectedSectionId, setSelectedLevel, setSelectedSection, setView } = useUIStore();
   const { deleteSection, updateWordPair, moveVerb, sections } = useDataStore();
-  const { draggingPairId, setDraggingPairId, draggingVerbId, setDraggingVerbId, draggingSectionId, setDraggingSectionId } = useDragContext();
+  const { draggingPairIds, setDraggingPairIds, setSelectedPairIds, draggingVerbIds, setDraggingVerbIds, setSelectedVerbIds, draggingSectionId, setDraggingSectionId } = useDragContext();
   const t = useT();
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
 
   const isSelected = selectedSectionId === section.id;
   const draggedSection = draggingSectionId !== null ? sections.find(s => s.id === draggingSectionId) : null;
-  const canAcceptPairDrop = draggingPairId !== null && currentPairSectionId !== section.id;
-  const canAcceptVerbDrop = draggingVerbId !== null && currentVerbSectionId !== section.id;
+  const canAcceptPairDrop = draggingPairIds.length > 0;
+  const canAcceptVerbDrop = draggingVerbIds.length > 0;
 
   const { dragProps, dragSourceClass } = useDragSource({
     id: section.id,
@@ -43,9 +41,10 @@ export function SectionItem({ section, onSectionDrop, currentPairSectionId, curr
         canAccept: canAcceptPairDrop,
         mode: 'content',
         onDrop: async () => {
-          if (draggingPairId !== null) {
-            await updateWordPair(draggingPairId, { level_id: section.level_id, section_id: section.id });
-            setDraggingPairId(null);
+          if (draggingPairIds.length > 0) {
+            await Promise.all(draggingPairIds.map((id) => updateWordPair(id, { level_id: section.level_id, section_id: section.id })));
+            setDraggingPairIds([]);
+            setSelectedPairIds([]);
           }
         },
       },
@@ -53,9 +52,10 @@ export function SectionItem({ section, onSectionDrop, currentPairSectionId, curr
         canAccept: canAcceptVerbDrop,
         mode: 'content',
         onDrop: async () => {
-          if (draggingVerbId !== null) {
-            await moveVerb(draggingVerbId, section.level_id, section.id);
-            setDraggingVerbId(null);
+          if (draggingVerbIds.length > 0) {
+            await Promise.all(draggingVerbIds.map((id) => moveVerb(id, section.level_id, section.id)));
+            setDraggingVerbIds([]);
+            setSelectedVerbIds([]);
           }
         },
       },

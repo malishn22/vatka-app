@@ -22,7 +22,7 @@ interface LevelItemProps {
 export function LevelItem({ level, onLevelDrop }: LevelItemProps) {
   const { selectedLevelId, setSelectedLevel, setSelectedSection, setView } = useUIStore();
   const { deleteLevel, fetchSections, sections, wordPairs, verbs, updateWordPair, moveVerb, reorderSections, moveSection } = useDataStore();
-  const { draggingPairId, setDraggingPairId, draggingVerbId, setDraggingVerbId, draggingSectionId, setDraggingSectionId, draggingLevelId, setDraggingLevelId } = useDragContext();
+  const { draggingPairIds, setDraggingPairIds, setSelectedPairIds, draggingVerbIds, setDraggingVerbIds, setSelectedVerbIds, draggingSectionId, setDraggingSectionId, draggingLevelId, setDraggingLevelId } = useDragContext();
   const t = useT();
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
@@ -32,21 +32,22 @@ export function LevelItem({ level, onLevelDrop }: LevelItemProps) {
   const isSelected = selectedLevelId === level.id;
   const levelSections = sections.filter((s) => s.level_id === level.id);
 
-  // Look up dragged pair's current location
-  const draggedPair = draggingPairId !== null ? wordPairs.find((p) => p.id === draggingPairId) : null;
-  const pairBelongsToThisLevel = draggedPair?.level_id === level.id;
-
   // Look up dragged section's current location
   const sectionBelongsToThisLevel = draggingSectionId !== null
     ? sections.find((s) => s.id === draggingSectionId)?.level_id === level.id
     : false;
 
-  // Look up dragged verb's current location
-  const draggedVerb = draggingVerbId !== null ? verbs.find((v) => v.id === draggingVerbId) : null;
-  const verbBelongsToThisLevel = draggedVerb?.level_id === level.id;
+  // Accept pair drop if any dragged pair belongs to a different level OR has a section assigned
+  const canAcceptPairDrop = draggingPairIds.length > 0 && draggingPairIds.some((id) => {
+    const p = wordPairs.find((wp) => wp.id === id);
+    return p ? (p.level_id !== level.id || p.section_id != null) : false;
+  });
 
-  const canAcceptPairDrop = draggingPairId !== null && (!pairBelongsToThisLevel || draggedPair?.section_id != null);
-  const canAcceptVerbDrop = draggingVerbId !== null && (!verbBelongsToThisLevel || draggedVerb?.section_id != null);
+  // Accept verb drop if any dragged verb belongs to a different level OR has a section assigned
+  const canAcceptVerbDrop = draggingVerbIds.length > 0 && draggingVerbIds.some((id) => {
+    const v = verbs.find((vb) => vb.id === id);
+    return v ? (v.level_id !== level.id || v.section_id != null) : false;
+  });
 
   const { dragProps, dragSourceClass } = useDragSource({
     id: level.id,
@@ -60,9 +61,10 @@ export function LevelItem({ level, onLevelDrop }: LevelItemProps) {
         canAccept: canAcceptPairDrop,
         mode: 'content',
         onDrop: async () => {
-          if (draggingPairId !== null) {
-            await updateWordPair(draggingPairId, { level_id: level.id, section_id: null });
-            setDraggingPairId(null);
+          if (draggingPairIds.length > 0) {
+            await Promise.all(draggingPairIds.map((id) => updateWordPair(id, { level_id: level.id, section_id: null })));
+            setDraggingPairIds([]);
+            setSelectedPairIds([]);
           }
         },
       },
@@ -70,9 +72,10 @@ export function LevelItem({ level, onLevelDrop }: LevelItemProps) {
         canAccept: canAcceptVerbDrop,
         mode: 'content',
         onDrop: async () => {
-          if (draggingVerbId !== null) {
-            await moveVerb(draggingVerbId, level.id, null);
-            setDraggingVerbId(null);
+          if (draggingVerbIds.length > 0) {
+            await Promise.all(draggingVerbIds.map((id) => moveVerb(id, level.id, null)));
+            setDraggingVerbIds([]);
+            setSelectedVerbIds([]);
           }
         },
       },
@@ -187,7 +190,7 @@ export function LevelItem({ level, onLevelDrop }: LevelItemProps) {
         {expanded && (
           <div className="pl-4 flex flex-col gap-0.5 mt-0.5">
             {levelSections.map((section) => (
-              <SectionItem key={section.id} section={section} onSectionDrop={handleSectionDrop} currentPairSectionId={draggedPair?.section_id} currentVerbSectionId={draggedVerb?.section_id} />
+              <SectionItem key={section.id} section={section} onSectionDrop={handleSectionDrop} />
             ))}
             <Button
               variant="icon"
