@@ -28,19 +28,19 @@ pub struct ParsedPair {
 pub struct ExportWordPair {
   pub source: String,
   pub target: String,
-  pub level_id: i64,
-  pub section_id: Option<i64>,
+  pub section_id: i64,
+  pub subsection_id: Option<i64>,
   pub disabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExportSection {
+pub struct ExportSubSection {
   pub id: i64,
   pub name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExportLevel {
+pub struct ExportSection {
   pub id: i64,
   pub name: String,
 }
@@ -56,8 +56,8 @@ pub struct ExportConjugation {
 pub struct ExportVerb {
   pub infinitive_source: String,
   pub infinitive_target: String,
-  pub level_id: i64,
-  pub section_id: Option<i64>,
+  pub section_id: i64,
+  pub subsection_id: Option<i64>,
   pub disabled: bool,
   pub auxiliary: Option<String>,
   pub case_preposition: Option<String>,
@@ -97,8 +97,8 @@ pub struct ParsedSpreadsheetResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportPayload {
   pub word_pairs: Vec<ExportWordPair>,
+  pub subsections: Vec<ExportSubSection>,
   pub sections: Vec<ExportSection>,
-  pub levels: Vec<ExportLevel>,
   pub file_label: String,
   pub source_label: String,
   pub target_label: String,
@@ -421,13 +421,13 @@ fn write_level_sheet(
 
 #[tauri::command]
 pub fn build_xlsx(payload: ExportPayload) -> Result<Vec<u8>, String> {
+  let mut subsection_map: HashMap<i64, String> = HashMap::new();
+  for s in payload.subsections.iter() {
+    subsection_map.insert(s.id, s.name.clone());
+  }
   let mut section_map: HashMap<i64, String> = HashMap::new();
   for s in payload.sections.iter() {
     section_map.insert(s.id, s.name.clone());
-  }
-  let mut level_map: HashMap<i64, String> = HashMap::new();
-  for l in payload.levels.iter() {
-    level_map.insert(l.id, l.name.clone());
   }
 
   let header = vec![
@@ -442,24 +442,24 @@ pub fn build_xlsx(payload: ExportPayload) -> Result<Vec<u8>, String> {
     pairs
       .iter()
       .map(|p| {
-        let lvl = level_map.get(&p.level_id).cloned().unwrap_or_default();
-        let sub = p.section_id.and_then(|id| section_map.get(&id).cloned()).unwrap_or_default();
+        let sec = section_map.get(&p.section_id).cloned().unwrap_or_default();
+        let sub = p.subsection_id.and_then(|id| subsection_map.get(&id).cloned()).unwrap_or_default();
         let hidden = if p.disabled { "Hidden" } else { "Shown" };
-        vec![p.source.clone(), p.target.clone(), lvl, sub, hidden.to_string()]
+        vec![p.source.clone(), p.target.clone(), sec, sub, hidden.to_string()]
       })
       .collect()
   };
 
   let mut workbook = Workbook::new();
 
-  let mut unique_level_ids: Vec<i64> = payload.word_pairs.iter().map(|p| p.level_id).collect();
-  unique_level_ids.sort();
-  unique_level_ids.dedup();
+  let mut unique_section_ids: Vec<i64> = payload.word_pairs.iter().map(|p| p.section_id).collect();
+  unique_section_ids.sort();
+  unique_section_ids.dedup();
 
-  if unique_level_ids.len() > 1 {
-    for lvl_id in unique_level_ids.iter() {
-      let pairs: Vec<ExportWordPair> = payload.word_pairs.iter().filter(|p| p.level_id == *lvl_id).cloned().collect();
-      let sheet_name_raw = level_map.get(lvl_id).cloned().unwrap_or_else(|| lvl_id.to_string());
+  if unique_section_ids.len() > 1 {
+    for sec_id in unique_section_ids.iter() {
+      let pairs: Vec<ExportWordPair> = payload.word_pairs.iter().filter(|p| p.section_id == *sec_id).cloned().collect();
+      let sheet_name_raw = section_map.get(sec_id).cloned().unwrap_or_else(|| sec_id.to_string());
       let sheet_name = sheet_name_raw.chars().take(31).collect::<String>();
       write_level_sheet(&mut workbook, &sheet_name, &header, &make_rows(&pairs)).map_err(|e| e.to_string())?;
     }
@@ -471,16 +471,16 @@ pub fn build_xlsx(payload: ExportPayload) -> Result<Vec<u8>, String> {
   // Write verb sheets (one row per tense, with dynamic Person/Form column pairs)
   if let Some(ref verbs) = payload.verbs {
     if !verbs.is_empty() {
-      let mut verb_level_ids: Vec<i64> = verbs.iter().map(|v| v.level_id).collect();
-      verb_level_ids.sort();
-      verb_level_ids.dedup();
+      let mut verb_section_ids: Vec<i64> = verbs.iter().map(|v| v.section_id).collect();
+      verb_section_ids.sort();
+      verb_section_ids.dedup();
 
       let mut used_sheet_names: Vec<String> = Vec::new();
 
-      for lvl_id in &verb_level_ids {
-        let lvl_verbs: Vec<&ExportVerb> = verbs.iter().filter(|v| v.level_id == *lvl_id).collect();
-        let lvl_label = level_map.get(lvl_id).cloned().unwrap_or_else(|| lvl_id.to_string());
-        let mut sheet_name = format!("Verbs - {}", lvl_label).chars().take(31).collect::<String>();
+      for sec_id in &verb_section_ids {
+        let sec_verbs: Vec<&ExportVerb> = verbs.iter().filter(|v| v.section_id == *sec_id).collect();
+        let sec_label = section_map.get(sec_id).cloned().unwrap_or_else(|| sec_id.to_string());
+        let mut sheet_name = format!("Verbs - {}", sec_label).chars().take(31).collect::<String>();
 
         // Deduplicate sheet names
         let base = sheet_name.clone();
@@ -514,9 +514,9 @@ pub fn build_xlsx(payload: ExportPayload) -> Result<Vec<u8>, String> {
 
         // Build rows
         let mut rows: Vec<Vec<String>> = Vec::new();
-        for v in &lvl_verbs {
-          let sec = level_map.get(&v.level_id).cloned().unwrap_or_default();
-          let sub = v.section_id.and_then(|id| section_map.get(&id).cloned()).unwrap_or_default();
+        for v in &sec_verbs {
+          let sec = section_map.get(&v.section_id).cloned().unwrap_or_default();
+          let sub = v.subsection_id.and_then(|id| subsection_map.get(&id).cloned()).unwrap_or_default();
           let hidden = if v.disabled { "Hidden".to_string() } else { "Shown".to_string() };
           let aux = v.auxiliary.clone().unwrap_or_default();
           let case_prep = v.case_preposition.clone().unwrap_or_default();
@@ -575,4 +575,3 @@ pub fn build_xlsx(payload: ExportPayload) -> Result<Vec<u8>, String> {
 
   workbook.save_to_buffer().map_err(|e| e.to_string())
 }
-

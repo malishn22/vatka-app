@@ -1,6 +1,6 @@
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeFile } from '@tauri-apps/plugin-fs';
-import type { WordPair, Section, Level, Language, Verb, Conjugation, VerbWithConjugations } from '../types';
+import type { WordPair, Subsection, Section, Language, Verb, Conjugation, VerbWithConjugations } from '../types';
 import { dbSelect } from '../db/client';
 import { isTauriRuntime } from '../utils/tauri';
 import { toBool } from '../utils/dbMapper';
@@ -12,43 +12,43 @@ async function tauriInvoke<T>(command: string, args: Record<string, unknown>): P
 
 interface UseExcelExportArgs {
   wordPairs: WordPair[];
-  sections: Section[];
-  level: Level;
+  subsections: Subsection[];
+  section: Section;
   language: Language;
   onSuccess: () => void;
 }
 
 export interface ExportPayload {
   wordPairs: WordPair[];
-  sections: Section[];   // subsections
-  levels: Level[];       // to resolve level name per pair
+  subsections: Subsection[];
+  sections: Section[];
   fileLabel: string;
   verbs?: VerbWithConjugations[];
 }
 
-export async function fetchWordPairsRaw(levelId: number): Promise<WordPair[]> {
+export async function fetchWordPairsRaw(sectionId: number): Promise<WordPair[]> {
   const rows = await dbSelect<Omit<WordPair, 'disabled'> & { disabled: number }>(
-    'SELECT * FROM word_pairs WHERE level_id = ? ORDER BY id',
-    [levelId]
+    'SELECT * FROM word_pairs WHERE section_id = ? ORDER BY id',
+    [sectionId]
   );
   return rows.map(r => ({ ...r, disabled: toBool(r.disabled) }));
 }
 
-export async function fetchSectionsRaw(levelId: number): Promise<Section[]> {
-  return dbSelect<Section>(
-    'SELECT * FROM sections WHERE level_id = ? ORDER BY position',
-    [levelId]
+export async function fetchSubsectionsRaw(sectionId: number): Promise<Subsection[]> {
+  return dbSelect<Subsection>(
+    'SELECT * FROM subsections WHERE section_id = ? ORDER BY position',
+    [sectionId]
   );
 }
 
-export async function fetchVerbsRaw(levelId: number): Promise<VerbWithConjugations[]> {
+export async function fetchVerbsRaw(sectionId: number): Promise<VerbWithConjugations[]> {
   const verbRows = await dbSelect<Omit<Verb, 'disabled'> & { disabled: number }>(
-    'SELECT * FROM verbs WHERE level_id = ? ORDER BY id',
-    [levelId]
+    'SELECT * FROM verbs WHERE section_id = ? ORDER BY id',
+    [sectionId]
   );
   const conjugationRows = await dbSelect<Conjugation>(
-    'SELECT c.* FROM conjugations c JOIN verbs v ON c.verb_id = v.id WHERE v.level_id = ? ORDER BY c.id',
-    [levelId]
+    'SELECT c.* FROM conjugations c JOIN verbs v ON c.verb_id = v.id WHERE v.section_id = ? ORDER BY c.id',
+    [sectionId]
   );
   return verbRows.map(v => ({
     ...v,
@@ -57,7 +57,7 @@ export async function fetchVerbsRaw(levelId: number): Promise<VerbWithConjugatio
   }));
 }
 
-export function useExcelExport({ wordPairs, sections, level, language, onSuccess }: UseExcelExportArgs) {
+export function useExcelExport({ wordPairs, subsections, section, language, onSuccess }: UseExcelExportArgs) {
   const safeFilename = (label: string, ext: string) => {
     return label.replace(/[/\\:*?"<>|]/g, '').replace(/\s+/g, '_') + `.${ext}`;
   };
@@ -68,9 +68,9 @@ export function useExcelExport({ wordPairs, sections, level, language, onSuccess
     }
 
     const pairs = payload?.wordPairs ?? wordPairs;
-    const secs = payload?.sections ?? sections;
-    const lvls = payload?.levels ?? [level];
-    const label = payload?.fileLabel ?? level.name;
+    const subsecs = payload?.subsections ?? subsections;
+    const secs = payload?.sections ?? [section];
+    const label = payload?.fileLabel ?? section.name;
 
     const verbsData = payload?.verbs ?? null;
 
@@ -79,20 +79,20 @@ export function useExcelExport({ wordPairs, sections, level, language, onSuccess
         word_pairs: pairs.map(p => ({
           source: p.source,
           target: p.target,
-          level_id: p.level_id,
           section_id: p.section_id,
+          subsection_id: p.subsection_id,
           disabled: Boolean(p.disabled),
         })),
+        subsections: subsecs.map(s => ({ id: s.id, name: s.name })),
         sections: secs.map(s => ({ id: s.id, name: s.name })),
-        levels: lvls.map(l => ({ id: l.id, name: l.name })),
         file_label: label,
         source_label: language.source,
         target_label: language.target,
         verbs: verbsData?.map(v => ({
           infinitive_source: v.infinitive_source,
           infinitive_target: v.infinitive_target,
-          level_id: v.level_id,
           section_id: v.section_id,
+          subsection_id: v.subsection_id,
           disabled: toBool(v.disabled),
           auxiliary: v.auxiliary ?? null,
           case_preposition: v.case_preposition ?? null,
@@ -114,19 +114,19 @@ export function useExcelExport({ wordPairs, sections, level, language, onSuccess
 
   const exportCsv = async (payload?: ExportPayload) => {
     const pairs = payload?.wordPairs ?? wordPairs;
-    const secs = payload?.sections ?? sections;
-    const lvls = payload?.levels ?? [level];
-    const label = payload?.fileLabel ?? level.name;
+    const subsecs = payload?.subsections ?? subsections;
+    const secs = payload?.sections ?? [section];
+    const label = payload?.fileLabel ?? section.name;
     const verbsData = payload?.verbs;
 
+    const subsectionMap = new Map<number, string>(subsecs.map(s => [s.id, s.name]));
     const sectionMap = new Map<number, string>(secs.map(s => [s.id, s.name]));
-    const levelMap = new Map<number, string>(lvls.map(l => [l.id, l.name]));
 
     const escapeCell = (v: string) => `"${v.replace(/"/g, '""')}"`;
 
     // If verb-only export (no word pairs), export verbs CSV with flat tense rows
     if (pairs.length === 0 && verbsData && verbsData.length > 0) {
-      // Fixed 14-column German Journey verb format:
+      // Fixed 14-column verb format:
       // 0: Source Infinitive, 1: Target Infinitive, 2: Section, 3: Subsection,
       // 4: Form Type, 5-10: Person/Form 1-6, 11: Auxiliary, 12: Case/Preposition, 13: Hidden
       const headerParts = [
@@ -140,8 +140,8 @@ export function useExcelExport({ wordPairs, sections, level, language, onSuccess
       const csvLines = [headerParts.map(escapeCell).join(',')];
 
       for (const v of verbsData) {
-        const lvlName = levelMap.get(v.level_id) ?? '';
-        const secName = v.section_id != null ? (sectionMap.get(v.section_id) ?? '') : '';
+        const secName = sectionMap.get(v.section_id) ?? '';
+        const subsecName = v.subsection_id != null ? (subsectionMap.get(v.subsection_id) ?? '') : '';
         const hidden = v.disabled ? 'Hidden' : 'Shown';
         const aux = v.auxiliary ?? '';
         const casePrep = v.case_preposition ?? '';
@@ -149,7 +149,7 @@ export function useExcelExport({ wordPairs, sections, level, language, onSuccess
         if (v.conjugations.length === 0) {
           const row = [
             escapeCell(v.infinitive_source), escapeCell(v.infinitive_target),
-            escapeCell(lvlName), escapeCell(secName), '',
+            escapeCell(secName), escapeCell(subsecName), '',
             '', '', '', '', '', '',
             escapeCell(aux), escapeCell(casePrep), escapeCell(hidden),
           ];
@@ -169,7 +169,7 @@ export function useExcelExport({ wordPairs, sections, level, language, onSuccess
             }
             const row = [
               escapeCell(v.infinitive_source), escapeCell(v.infinitive_target),
-              escapeCell(lvlName), escapeCell(secName), escapeCell(formType),
+              escapeCell(secName), escapeCell(subsecName), escapeCell(formType),
               ...personForms,
               escapeCell(aux), escapeCell(casePrep), escapeCell(hidden),
             ];
@@ -191,10 +191,10 @@ export function useExcelExport({ wordPairs, sections, level, language, onSuccess
     const lines = [
       `${language.source},${language.target},Section,Subsection,Hidden`,
       ...pairs.map(p => {
-        const secName = p.section_id != null ? (sectionMap.get(p.section_id) ?? '') : '';
-        const lvlName = levelMap.get(p.level_id) ?? '';
+        const subsecName = p.subsection_id != null ? (subsectionMap.get(p.subsection_id) ?? '') : '';
+        const secName = sectionMap.get(p.section_id) ?? '';
         const hidden = p.disabled ? 'Hidden' : 'Shown';
-        return `${escapeCell(p.source)},${escapeCell(p.target)},${escapeCell(lvlName)},${escapeCell(secName)},${escapeCell(hidden)}`;
+        return `${escapeCell(p.source)},${escapeCell(p.target)},${escapeCell(secName)},${escapeCell(subsecName)},${escapeCell(hidden)}`;
       }),
     ];
     const path = await save({

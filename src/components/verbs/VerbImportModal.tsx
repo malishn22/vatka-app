@@ -1,13 +1,13 @@
 import { ImportModal } from '../wordpairs/ImportModal';
-import type { Section, Language, Level } from '../../types';
+import type { Subsection, Language, Section } from '../../types';
 
 interface VerbImportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  levelId: number;
+  sectionId: number;
   language: Language;
+  subsections: Subsection[];
   sections: Section[];
-  levels: Level[];
   sourceLabel: string;
   targetLabel: string;
   onImported: (count: number, skipped: number) => void;

@@ -11,24 +11,33 @@ CREATE TABLE IF NOT EXISTS languages (
   target     TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE TABLE IF NOT EXISTS levels (
+CREATE TABLE IF NOT EXISTS sections (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   language_id INTEGER NOT NULL REFERENCES languages(id) ON DELETE CASCADE,
   name        TEXT NOT NULL,
   position    INTEGER NOT NULL DEFAULT 0,
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE TABLE IF NOT EXISTS word_pairs (
+CREATE TABLE IF NOT EXISTS subsections (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  level_id   INTEGER NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
-  source     TEXT NOT NULL,
-  target     TEXT NOT NULL,
+  section_id INTEGER NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+  name       TEXT NOT NULL,
+  position   INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS word_pairs (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  section_id    INTEGER NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+  subsection_id INTEGER REFERENCES subsections(id) ON DELETE SET NULL,
+  source        TEXT NOT NULL,
+  target        TEXT NOT NULL,
+  disabled      INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS verbs (
   id                INTEGER PRIMARY KEY AUTOINCREMENT,
-  level_id          INTEGER NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
-  section_id        INTEGER REFERENCES sections(id) ON DELETE SET NULL,
+  section_id        INTEGER NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+  subsection_id     INTEGER REFERENCES subsections(id) ON DELETE SET NULL,
   infinitive_source TEXT NOT NULL,
   infinitive_target TEXT NOT NULL,
   disabled          INTEGER NOT NULL DEFAULT 0,

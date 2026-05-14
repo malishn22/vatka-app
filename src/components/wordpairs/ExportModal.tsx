@@ -1,22 +1,22 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Modal } from '../shared/Modal';
 import { Button } from '../shared/Button';
-import type { WordPair, Section, Level, Language, VerbWithConjugations } from '../../types';
-import { useExcelExport, fetchWordPairsRaw, fetchSectionsRaw, fetchVerbsRaw, type ExportPayload } from '../../hooks/useExcelExport';
+import type { WordPair, Subsection, Section, Language, VerbWithConjugations } from '../../types';
+import { useExcelExport, fetchWordPairsRaw, fetchSubsectionsRaw, fetchVerbsRaw, type ExportPayload } from '../../hooks/useExcelExport';
 import { useT } from '../../i18n/useT';
-import { LevelMultiSelect } from '../shared/LevelMultiSelect';
+import { SectionMultiSelect } from '../shared/SectionMultiSelect';
 
 type ExportFormat = 'xlsx' | 'csv';
-type ExportStep = 'select-levels' | 'select-pairs';
+type ExportStep = 'select-sections' | 'select-pairs';
 
 interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   format: ExportFormat;
   language: Language;
-  levels: Level[];
-  currentLevelId: number;
   sections: Section[];
+  currentSectionId: number;
+  subsections: Subsection[];
   wordPairs: WordPair[];
   onSuccess: () => void;
 }
@@ -26,18 +26,18 @@ export function ExportModal({
   onClose,
   format,
   language,
-  levels,
-  currentLevelId,
   sections,
+  currentSectionId,
+  subsections,
   wordPairs,
   onSuccess,
 }: ExportModalProps) {
   const t = useT();
-  const currentLevel = levels.find(l => l.id === currentLevelId);
+  const currentSection = sections.find(s => s.id === currentSectionId);
 
   // Step 1 state
-  const [step, setStep] = useState<ExportStep>('select-levels');
-  const [selectedLevelIds, setSelectedLevelIds] = useState<Set<number>>(new Set());
+  const [step, setStep] = useState<ExportStep>('select-sections');
+  const [selectedSectionIds, setSelectedSectionIds] = useState<Set<number>>(new Set());
   const [includeVerbs, setIncludeVerbs] = useState(true);
 
   // Step 2 state
@@ -47,15 +47,15 @@ export function ExportModal({
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [allPairs, setAllPairs] = useState<WordPair[]>([]);
-  const [allSubsections, setAllSubsections] = useState<Section[]>([]);
+  const [allSubsections, setAllSubsections] = useState<Subsection[]>([]);
   const [allVerbs, setAllVerbs] = useState<VerbWithConjugations[]>([]);
-  const [levelMap, setLevelMap] = useState<Map<number, string>>(new Map());
+  const [sectionMap, setSectionMap] = useState<Map<number, string>>(new Map());
 
   // Reset when modal opens
   useEffect(() => {
     if (isOpen) {
-      setStep('select-levels');
-      setSelectedLevelIds(new Set(levels.map(l => l.id)));
+      setStep('select-sections');
+      setSelectedSectionIds(new Set(sections.map(s => s.id)));
       setIncludeVerbs(true);
       setSearch('');
       setSelectedIds(new Set());
@@ -64,10 +64,10 @@ export function ExportModal({
       setAllSubsections([]);
       setAllVerbs([]);
     }
-  }, [isOpen, levels]);
+  }, [isOpen, sections]);
 
-  const toggleLevel = (id: number) => {
-    setSelectedLevelIds(prev => {
+  const toggleSection = (id: number) => {
+    setSelectedSectionIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -79,19 +79,19 @@ export function ExportModal({
     setIsLoading(true);
     try {
       const combinedPairs: WordPair[] = [];
-      const combinedSubsections: Section[] = [];
+      const combinedSubsections: Subsection[] = [];
       const combinedVerbs: VerbWithConjugations[] = [];
       const seenSubsectionIds = new Set<number>();
-      const newLevelMap = new Map<number, string>();
+      const newSectionMap = new Map<number, string>();
 
-      for (const lv of levels) {
-        if (!selectedLevelIds.has(lv.id)) continue;
-        newLevelMap.set(lv.id, lv.name);
+      for (const sec of sections) {
+        if (!selectedSectionIds.has(sec.id)) continue;
+        newSectionMap.set(sec.id, sec.name);
 
-        const pairs = lv.id === currentLevelId ? wordPairs : await fetchWordPairsRaw(lv.id);
+        const pairs = sec.id === currentSectionId ? wordPairs : await fetchWordPairsRaw(sec.id);
         combinedPairs.push(...pairs);
 
-        const subs = lv.id === currentLevelId ? sections : await fetchSectionsRaw(lv.id);
+        const subs = sec.id === currentSectionId ? subsections : await fetchSubsectionsRaw(sec.id);
         for (const sub of subs) {
           if (!seenSubsectionIds.has(sub.id)) {
             combinedSubsections.push(sub);
@@ -100,7 +100,7 @@ export function ExportModal({
         }
 
         if (includeVerbs) {
-          const verbs = await fetchVerbsRaw(lv.id);
+          const verbs = await fetchVerbsRaw(sec.id);
           combinedVerbs.push(...verbs);
         }
       }
@@ -108,7 +108,7 @@ export function ExportModal({
       setAllPairs(combinedPairs);
       setAllSubsections(combinedSubsections);
       setAllVerbs(combinedVerbs);
-      setLevelMap(newLevelMap);
+      setSectionMap(newSectionMap);
       setSelectedIds(new Set(combinedPairs.map(p => p.id)));
       setStep('select-pairs');
     } finally {
@@ -159,8 +159,8 @@ export function ExportModal({
 
   const { exportXlsx, exportCsv } = useExcelExport({
     wordPairs,
-    sections,
-    level: currentLevel ?? levels[0],
+    subsections,
+    section: currentSection ?? sections[0],
     language,
     onSuccess: () => {
       onSuccess();
@@ -174,16 +174,16 @@ export function ExportModal({
     try {
       const selectedPairs = allPairs.filter(p => selectedIds.has(p.id));
       const referencedSubsectionIds = new Set(
-        selectedPairs.map(p => p.section_id).filter((id): id is number => id !== null)
+        selectedPairs.map(p => p.subsection_id).filter((id): id is number => id !== null)
       );
-      const referencedLevelIds = new Set(selectedPairs.map(p => p.level_id));
+      const referencedSectionIds = new Set(selectedPairs.map(p => p.section_id));
       const filteredSubsections = allSubsections.filter(s => referencedSubsectionIds.has(s.id));
-      const filteredLevels = levels.filter(l => referencedLevelIds.has(l.id));
+      const filteredSections = sections.filter(s => referencedSectionIds.has(s.id));
       const payload: ExportPayload = {
         wordPairs: selectedPairs,
-        sections: filteredSubsections,
-        levels: filteredLevels,
-        fileLabel: filteredLevels.length === 1 ? (filteredLevels[0].name) : language.name,
+        subsections: filteredSubsections,
+        sections: filteredSections,
+        fileLabel: filteredSections.length === 1 ? (filteredSections[0].name) : language.name,
         verbs: allVerbs.length > 0 ? allVerbs : undefined,
       };
       if (format === 'xlsx') await exportXlsx(payload);
@@ -195,12 +195,12 @@ export function ExportModal({
     }
   };
 
-  // --- Step 1: Select Sections (levels) ---
-  if (step === 'select-levels') {
+  // --- Step 1: Select Sections ---
+  if (step === 'select-sections') {
     const footer = (
       <>
         <Button variant="secondary" onClick={onClose} disabled={isLoading}>{t.cancel}</Button>
-        <Button variant="primary" onClick={handleNext} disabled={isLoading || selectedLevelIds.size === 0}>
+        <Button variant="primary" onClick={handleNext} disabled={isLoading || selectedSectionIds.size === 0}>
           {isLoading ? '...' : 'Next →'}
         </Button>
       </>
@@ -210,11 +210,11 @@ export function ExportModal({
       <Modal isOpen={isOpen} onClose={onClose} title={t.exportModalTitleCombined} footer={footer}>
         <div className="flex flex-col gap-3">
           <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.exportScope}</p>
-          <LevelMultiSelect
-            levels={levels}
-            selectedLevelIds={selectedLevelIds}
-            currentLevelId={currentLevelId}
-            onToggle={toggleLevel}
+          <SectionMultiSelect
+            sections={sections}
+            selectedSectionIds={selectedSectionIds}
+            currentSectionId={currentSectionId}
+            onToggle={toggleSection}
           />
           <hr className="border-gray-200 dark:border-gray-700" />
           <label className="flex items-center gap-2 cursor-pointer">
@@ -234,7 +234,7 @@ export function ExportModal({
   // --- Step 2: Select Pairs ---
   const footer = (
     <>
-      <Button variant="secondary" onClick={() => setStep('select-levels')} disabled={isExporting}>
+      <Button variant="secondary" onClick={() => setStep('select-sections')} disabled={isExporting}>
         ← Back
       </Button>
       <Button variant="primary" onClick={handleExport} disabled={isExporting || selectedIds.size === 0}>
@@ -243,7 +243,7 @@ export function ExportModal({
     </>
   );
 
-  const showSectionCol = selectedLevelIds.size > 1;
+  const showSectionCol = selectedSectionIds.size > 1;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={t.exportModalTitle} footer={footer} size="lg">
@@ -296,8 +296,8 @@ export function ExportModal({
             <table className="w-full text-sm border-collapse">
               <tbody>
                 {filteredPairs.map(pair => {
-                  const subsecName = pair.section_id != null ? subsectionMap.get(pair.section_id) : undefined;
-                  const secName = levelMap.get(pair.level_id);
+                  const subsecName = pair.subsection_id != null ? subsectionMap.get(pair.subsection_id) : undefined;
+                  const secName = sectionMap.get(pair.section_id);
                   return (
                     <tr
                       key={pair.id}

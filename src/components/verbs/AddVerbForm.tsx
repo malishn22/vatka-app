@@ -8,16 +8,16 @@ import { VerbFormEditor } from './VerbFormEditor';
 import type { FormTypeGroup } from '../../types';
 
 interface AddVerbFormProps {
-  levelId: number;
-  sectionId: number | null;
+  sectionId: number;
+  subsectionId: number | null;
   languageId: number;
   sourceLabel: string;
   targetLabel: string;
   onAdded?: () => void;
 }
 
-export function AddVerbForm({ levelId, sectionId, languageId, sourceLabel, targetLabel, onAdded }: AddVerbFormProps) {
-  const { addVerb, levels, verbExistsInLanguage, fetchUsedFormTypes, fetchUsedPersons } = useDataStore();
+export function AddVerbForm({ sectionId, subsectionId, languageId, sourceLabel, targetLabel, onAdded }: AddVerbFormProps) {
+  const { addVerb, sections, verbExistsInLanguage, fetchUsedFormTypes, fetchUsedPersons } = useDataStore();
   const t = useT();
   const [infinitiveSource, setInfinitiveSource] = useState('');
   const [infinitiveTarget, setInfinitiveTarget] = useState('');
@@ -136,17 +136,17 @@ export function AddVerbForm({ levelId, sectionId, languageId, sourceLabel, targe
       return;
     }
 
-    const level = levels.find((l) => l.id === levelId);
-    if (level) {
-      const exists = await verbExistsInLanguage(level.language_id, infinitiveSource.trim(), infinitiveTarget.trim());
+    const section = sections.find((s) => s.id === sectionId);
+    if (section) {
+      const exists = await verbExistsInLanguage(section.language_id, infinitiveSource.trim(), infinitiveTarget.trim());
       if (exists) { setError(t.verbAlreadyExists); return; }
     }
 
     try {
       await addVerb(
         {
-          level_id: levelId,
           section_id: sectionId,
+          subsection_id: subsectionId,
           infinitive_source: infinitiveSource.trim(),
           infinitive_target: infinitiveTarget.trim(),
           auxiliary: auxiliary.trim() || null,

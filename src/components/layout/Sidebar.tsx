@@ -3,13 +3,13 @@ import { useUIStore } from '../../store/uiStore';
 import { useDataStore } from '../../store/dataStore';
 import { Button } from '../shared/Button';
 import { Dropdown } from '../shared/Dropdown';
-import { SectionedLevelList } from '../sections/SectionedLevelList';
+import { SectionList } from '../sections/SectionList';
 import { useT } from '../../i18n/useT';
 import { dbReadyPromise } from '../../db/client';
 
 export function Sidebar() {
   const { selectedLanguageId, setSelectedLanguage, setView, currentView } = useUIStore();
-  const { languages, levels, fetchLanguages, fetchLevels } = useDataStore();
+  const { languages, sections, fetchLanguages, fetchSections } = useDataStore();
   const t = useT();
 
   useEffect(() => {
@@ -18,7 +18,7 @@ export function Sidebar() {
 
   useEffect(() => {
     if (selectedLanguageId !== null) {
-      fetchLevels(selectedLanguageId);
+      fetchSections(selectedLanguageId);
     }
   }, [selectedLanguageId]);
 
@@ -37,8 +37,8 @@ export function Sidebar() {
 
       <div className="flex-1 overflow-y-auto p-3">
         {selectedLanguageId !== null && (
-          <SectionedLevelList
-            levels={levels.filter((l) => l.language_id === selectedLanguageId)}
+          <SectionList
+            sections={sections.filter((s) => s.language_id === selectedLanguageId)}
             languageId={selectedLanguageId}
           />
         )}

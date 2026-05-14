@@ -5,7 +5,7 @@ import type { WordPair } from '../../types';
 
 export interface WordPairSlice {
   wordPairs: WordPair[];
-  fetchWordPairs: (levelId: number) => Promise<void>;
+  fetchWordPairs: (sectionId: number) => Promise<void>;
   addWordPair: (data: Omit<WordPair, 'id' | 'created_at'>) => Promise<void>;
   updateWordPair: (id: number, data: Partial<Omit<WordPair, 'id' | 'created_at'>>) => Promise<void>;
   deleteWordPair: (id: number) => Promise<void>;
@@ -15,14 +15,14 @@ export interface WordPairSlice {
 export const createWordPairSlice: StateCreator<any, [], [], WordPairSlice> = (set, get) => ({
   wordPairs: [],
 
-  fetchWordPairs: async (levelId) => {
+  fetchWordPairs: async (sectionId) => {
     set({ isLoading: true, error: null });
     try {
       const rows = await dbSelect<WordPair & { disabled: number | boolean }>(
-        'SELECT * FROM word_pairs WHERE level_id = ? ORDER BY id',
-        [levelId]
+        'SELECT * FROM word_pairs WHERE section_id = ? ORDER BY id',
+        [sectionId]
       );
-      const wordPairs = rows.map((r) => ({ ...r, disabled: toBool(r.disabled), section_id: r.section_id ?? null }));
+      const wordPairs = rows.map((r) => ({ ...r, disabled: toBool(r.disabled), subsection_id: r.subsection_id ?? null }));
       set({ wordPairs, isLoading: false });
     } catch (e) {
       set({ error: String(e), isLoading: false });
@@ -31,10 +31,10 @@ export const createWordPairSlice: StateCreator<any, [], [], WordPairSlice> = (se
 
   addWordPair: async (data) => {
     await dbExecute(
-      'INSERT INTO word_pairs (level_id, section_id, source, target, disabled) VALUES (?, ?, ?, ?, ?)',
-      [data.level_id, data.section_id ?? null, data.source, data.target, fromBool(data.disabled ?? false)]
+      'INSERT INTO word_pairs (section_id, subsection_id, source, target, disabled) VALUES (?, ?, ?, ?, ?)',
+      [data.section_id, data.subsection_id ?? null, data.source, data.target, fromBool(data.disabled ?? false)]
     );
-    await get().fetchWordPairs(data.level_id);
+    await get().fetchWordPairs(data.section_id);
   },
 
   updateWordPair: async (id, data) => {
@@ -45,11 +45,11 @@ export const createWordPairSlice: StateCreator<any, [], [], WordPairSlice> = (se
       if (!rows[0]) return;
       const pair = { ...rows[0], disabled: toBool(rows[0].disabled) };
       const disabled = fromBool(data.disabled !== undefined ? data.disabled : (pair.disabled ?? false));
-      const newLevelId = data.level_id ?? pair.level_id;
-      const newSectionId = 'section_id' in data ? data.section_id : pair.section_id;
+      const newLevelId = data.section_id ?? pair.section_id;
+      const newSubsectionId = 'subsection_id' in data ? data.subsection_id : pair.subsection_id;
       await dbExecute(
-        'UPDATE word_pairs SET source = ?, target = ?, disabled = ?, level_id = ?, section_id = ? WHERE id = ?',
-        [data.source ?? pair.source, data.target ?? pair.target, disabled, newLevelId, newSectionId, id]
+        'UPDATE word_pairs SET source = ?, target = ?, disabled = ?, section_id = ?, subsection_id = ? WHERE id = ?',
+        [data.source ?? pair.source, data.target ?? pair.target, disabled, newLevelId, newSubsectionId, id]
       );
       await get().fetchWordPairs(newLevelId);
     } catch (e) {
@@ -70,7 +70,7 @@ export const createWordPairSlice: StateCreator<any, [], [], WordPairSlice> = (se
     try {
       const rows = await dbSelect<{ found: number }>(
         `SELECT 1 AS found FROM word_pairs wp
-         JOIN levels l ON wp.level_id = l.id
+         JOIN sections l ON wp.section_id = l.id
          WHERE l.language_id = ?
            AND LOWER(TRIM(wp.source)) = LOWER(TRIM(?))
            AND LOWER(TRIM(wp.target)) = LOWER(TRIM(?))

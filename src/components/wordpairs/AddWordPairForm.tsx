@@ -6,14 +6,14 @@ import { useT } from '../../i18n/useT';
 import { usePairedPaste } from '../../hooks/usePairedPaste';
 
 interface AddWordPairFormProps {
-  levelId: number;
-  sectionId: number | null;
+  sectionId: number;
+  subsectionId: number | null;
   sourceLabel: string;
   targetLabel: string;
 }
 
-export function AddWordPairForm({ levelId, sectionId, sourceLabel, targetLabel }: AddWordPairFormProps) {
-  const { addWordPair, levels, wordPairExistsInLanguage } = useDataStore();
+export function AddWordPairForm({ sectionId, subsectionId, sourceLabel, targetLabel }: AddWordPairFormProps) {
+  const { addWordPair, sections, wordPairExistsInLanguage } = useDataStore();
   const t = useT();
   const [source, setSource] = useState('');
   const [target, setTarget] = useState('');
@@ -22,7 +22,7 @@ export function AddWordPairForm({ levelId, sectionId, sourceLabel, targetLabel }
   const sourceRef = useRef<HTMLInputElement>(null);
   const targetRef = useRef<HTMLInputElement>(null);
 
-  const level = levels.find((l) => l.id === levelId);
+  const section = sections.find((s) => s.id === sectionId);
   const handlePairedPaste = usePairedPaste((left, right) => {
     setSource(left);
     setTarget(right);
@@ -32,11 +32,11 @@ export function AddWordPairForm({ levelId, sectionId, sourceLabel, targetLabel }
 
   const handleAdd = async () => {
     if (!source.trim() || !target.trim()) { setError(t.bothFieldsRequired); return; }
-    if (level) {
-      const exists = await wordPairExistsInLanguage(level.language_id, source.trim(), target.trim());
+    if (section) {
+      const exists = await wordPairExistsInLanguage(section.language_id, source.trim(), target.trim());
       if (exists) { setError(t.wordPairAlreadyExists); return; }
     }
-    await addWordPair({ level_id: levelId, section_id: sectionId, source: source.trim(), target: target.trim() });
+    await addWordPair({ section_id: sectionId, subsection_id: subsectionId, source: source.trim(), target: target.trim() });
     setSource('');
     setTarget('');
     setError('');

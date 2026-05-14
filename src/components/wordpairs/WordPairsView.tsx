@@ -19,8 +19,8 @@ import { PlayModeModal } from '../play/PlayModeModal';
 import type { GameMode } from '../../store/uiStore';
 
 export function WordPairsView() {
-  const { selectedLevelId, selectedSectionId, selectedLanguageId, setView, quizOptionCount, quizDirection, contentTab, setContentTab, conjugationMode, conjugationOptionCount } = useUIStore();
-  const { levels, languages, sections, wordPairs, fetchWordPairs, verbs, fetchVerbs } = useDataStore();
+  const { selectedSectionId, selectedSubsectionId, selectedLanguageId, setView, quizOptionCount, quizDirection, contentTab, setContentTab, conjugationMode, conjugationOptionCount } = useUIStore();
+  const { sections, languages, subsections, wordPairs, fetchWordPairs, verbs, fetchVerbs } = useDataStore();
   const { initGame } = usePlayStore();
   const { initQuiz } = useQuizStore();
   const { initConjugationPlay } = useConjugationPlayStore();
@@ -36,27 +36,27 @@ export function WordPairsView() {
   const { toggle: handleTogglePairSelect } = useToggleSelection(selectedPairIds, setSelectedPairIds);
   useClickOutside(addFormRef, () => setAddFormOpen(false));
 
-  const level = levels.find((l) => l.id === selectedLevelId);
-  const language = languages.find((l) => l.id === selectedLanguageId);
   const section = sections.find((s) => s.id === selectedSectionId);
-  const levelSections = sections.filter((s) => s.level_id === selectedLevelId);
-  const languageLevels = levels.filter((l) => l.language_id === selectedLanguageId);
+  const language = languages.find((l) => l.id === selectedLanguageId);
+  const subsection = subsections.find((s) => s.id === selectedSubsectionId);
+  const sectionSubsections = subsections.filter((s) => s.section_id === selectedSectionId);
+  const languageSections = sections.filter((s) => s.language_id === selectedLanguageId);
 
   useEffect(() => {
-    if (selectedLevelId !== null) {
-      fetchWordPairs(selectedLevelId);
-      fetchVerbs(selectedLevelId);
+    if (selectedSectionId !== null) {
+      fetchWordPairs(selectedSectionId);
+      fetchVerbs(selectedSectionId);
     }
-  }, [selectedLevelId]);
+  }, [selectedSectionId]);
 
-  const displayedPairs = selectedSectionId !== null
-    ? wordPairs.filter((p) => p.section_id === selectedSectionId)
+  const displayedPairs = selectedSubsectionId !== null
+    ? wordPairs.filter((p) => p.subsection_id === selectedSubsectionId)
     : wordPairs;
 
   const activePairs = displayedPairs.filter((p) => !p.disabled);
 
-  const displayedVerbs = selectedSectionId !== null
-    ? verbs.filter((v) => v.section_id === selectedSectionId)
+  const displayedVerbs = selectedSubsectionId !== null
+    ? verbs.filter((v) => v.subsection_id === selectedSubsectionId)
     : verbs;
   const activeVerbs = displayedVerbs.filter((v) => !v.disabled);
   const activeConjugations = activeVerbs.flatMap((v) => v.conjugations);
@@ -80,12 +80,12 @@ export function WordPairsView() {
     setView('play');
   };
 
-  if (!level) {
-    const hasNoLevels = language && languageLevels.length === 0;
+  if (!section) {
+    const hasNoSections = language && languageSections.length === 0;
     return (
       <div className="text-center py-16 text-gray-400 dark:text-gray-500 flex flex-col items-center gap-4">
-        <p>{t.selectLevelFromSidebar}</p>
-        {hasNoLevels && (
+        <p>{t.selectSectionFromSidebar}</p>
+        {hasNoSections && (
           <>
             <Button variant="secondary" onClick={() => setImportModalOpen(true)}>
               {t.import}
@@ -93,10 +93,10 @@ export function WordPairsView() {
             <ImportModal
               isOpen={importModalOpen}
               onClose={() => setImportModalOpen(false)}
-              levelId={0}
+              sectionId={0}
               language={language}
-              sections={[]}
-              levels={languageLevels}
+              subsections={[]}
+              sections={languageSections}
               sourceLabel={language.source}
               targetLabel={language.target}
               onImported={() => { setImportModalOpen(false); }}
@@ -113,7 +113,7 @@ export function WordPairsView() {
         <div>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">{language?.name}</p>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-50">
-            {level.name}{section ? ` — ${section.name}` : ''}
+            {section.name}{subsection ? ` — ${subsection.name}` : ''}
           </h2>
         </div>
         <div className="flex items-center gap-2">
@@ -178,8 +178,8 @@ export function WordPairsView() {
               {addFormOpen && (
                 <div className="absolute right-0 mt-1 w-[480px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10">
                   <AddWordPairForm
-                    levelId={level.id}
-                    sectionId={selectedSectionId}
+                    sectionId={section.id}
+                    subsectionId={selectedSubsectionId}
                     sourceLabel={language?.source ?? t.source}
                     targetLabel={language?.target ?? t.target}
                   />
@@ -214,9 +214,9 @@ export function WordPairsView() {
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                       {language?.target ?? t.target}
                     </th>
-                    {selectedSectionId === null && (
+                    {selectedSubsectionId === null && (
                       <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                        {t.section}
+                        {t.subsection}
                       </th>
                     )}
                     <th className="px-4 py-2.5" />
@@ -227,8 +227,8 @@ export function WordPairsView() {
                     <WordPairRow
                       key={pair.id}
                       pair={pair}
-                      showSection={selectedSectionId === null}
-                      sections={sections}
+                      showSection={selectedSubsectionId === null}
+                      subsections={subsections}
                       isSelected={selectedPairIds.includes(pair.id)}
                       onToggleSelect={(additive) => handleTogglePairSelect(pair.id, additive)}
                     />
@@ -248,10 +248,10 @@ export function WordPairsView() {
         <ImportModal
           isOpen={importModalOpen}
           onClose={() => setImportModalOpen(false)}
-          levelId={level.id}
+          sectionId={section.id}
           language={language}
-          sections={levelSections}
-          levels={languageLevels}
+          subsections={sectionSubsections}
+          sections={languageSections}
           sourceLabel={language.source}
           targetLabel={language.target}
           onImported={(count, skipped) => setToastMsg(t.importResult(count, skipped))}
@@ -264,9 +264,9 @@ export function WordPairsView() {
           onClose={() => setExportFormat(null)}
           format={exportFormat}
           language={language}
-          levels={languageLevels}
-          currentLevelId={level.id}
-          sections={levelSections}
+          sections={languageSections}
+          currentSectionId={section.id}
+          subsections={sectionSubsections}
           wordPairs={wordPairs}
           onSuccess={() => setToastMsg(t.exportedSuccessfully)}
         />

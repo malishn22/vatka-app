@@ -3,7 +3,7 @@ import type React from 'react';
 import { useDataStore } from '../../store/dataStore';
 import { Button } from '../shared/Button';
 import { Input } from '../shared/Input';
-import type { WordPair, Section } from '../../types';
+import type { WordPair, Subsection } from '../../types';
 import { useT } from '../../i18n/useT';
 import { PencilIcon, TrashIcon, EyeIcon, EyeOffIcon } from '../shared/Icons';
 import { SectionBadge } from '../shared/SectionBadge';
@@ -12,12 +12,12 @@ import { useDragContext } from '../../context/DragContext';
 interface WordPairRowProps {
   pair: WordPair;
   showSection?: boolean;
-  sections?: Section[];
+  subsections?: Subsection[];
   isSelected?: boolean;
   onToggleSelect?: (additive: boolean) => void;
 }
 
-export function WordPairRow({ pair, showSection, sections, isSelected = false, onToggleSelect }: WordPairRowProps) {
+export function WordPairRow({ pair, showSection, subsections, isSelected = false, onToggleSelect }: WordPairRowProps) {
   const { updateWordPair, deleteWordPair } = useDataStore();
   const { draggingPairIds, setDraggingPairIds, selectedPairIds, setSelectedPairIds } = useDragContext();
   const t = useT();
@@ -86,7 +86,7 @@ export function WordPairRow({ pair, showSection, sections, isSelected = false, o
         </td>
         {showSection && (
           <td className="px-4 py-2">
-            <SectionBadge name={sections?.find((s) => s.id === pair.section_id)?.name} />
+            <SectionBadge name={subsections?.find((s) => s.id === pair.subsection_id)?.name} />
           </td>
         )}
         <td className="px-4 py-2 text-right">
@@ -118,7 +118,7 @@ export function WordPairRow({ pair, showSection, sections, isSelected = false, o
       <td className="px-4 py-2.5 text-sm text-gray-800 dark:text-gray-200">{pair.target}</td>
       {showSection && (
         <td className="px-4 py-2.5">
-          <SectionBadge name={sections?.find((s) => s.id === pair.section_id)?.name} />
+          <SectionBadge name={subsections?.find((s) => s.id === pair.subsection_id)?.name} />
         </td>
       )}
       <td className="px-4 py-2.5 text-right">

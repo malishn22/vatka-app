@@ -11,6 +11,7 @@ export function getDb(): Promise<Database> {
 
 let _resolveReady!: () => void;
 export const dbReadyPromise = new Promise<void>((res) => { _resolveReady = res; });
+getDb().then(_resolveReady).catch(_resolveReady);
 
 export async function dbSelect<T>(sql: string, params: unknown[] = []): Promise<T[]> {
   const db = await getDb();
@@ -31,81 +32,4 @@ export async function dbTransaction(fn: () => Promise<void>): Promise<void> {
     await dbExecute('ROLLBACK');
     throw err;
   }
-}
-
-export async function runMigrations(): Promise<void> {
-  try {
-    await dbExecute(
-      'ALTER TABLE word_pairs ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0'
-    );
-  } catch {
-    // Column already exists — safe to ignore
-  }
-  try {
-    await dbExecute(
-      `CREATE TABLE IF NOT EXISTS sections (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        level_id INTEGER NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
-        position INTEGER NOT NULL DEFAULT 0,
-        created_at TEXT DEFAULT (datetime('now'))
-      )`
-    );
-  } catch {
-    // Safe to ignore
-  }
-  try {
-    await dbExecute(
-      'ALTER TABLE word_pairs ADD COLUMN section_id INTEGER REFERENCES sections(id) ON DELETE SET NULL'
-    );
-  } catch {
-    // Column already exists — safe to ignore
-  }
-  try {
-    await dbExecute(
-      `CREATE TABLE IF NOT EXISTS verbs (
-        id                INTEGER PRIMARY KEY AUTOINCREMENT,
-        level_id          INTEGER NOT NULL REFERENCES levels(id) ON DELETE CASCADE,
-        section_id        INTEGER REFERENCES sections(id) ON DELETE SET NULL,
-        infinitive_source TEXT NOT NULL,
-        infinitive_target TEXT NOT NULL,
-        disabled          INTEGER NOT NULL DEFAULT 0,
-        auxiliary         TEXT,
-        case_preposition  TEXT,
-        created_at        TEXT NOT NULL DEFAULT (datetime('now'))
-      )`
-    );
-  } catch (e) {
-    console.error('Verbs table migration failed:', e);
-  }
-  try {
-    await dbExecute('ALTER TABLE verbs ADD COLUMN auxiliary TEXT');
-  } catch {
-    // Column already exists — safe to ignore
-  }
-  try {
-    await dbExecute('ALTER TABLE verbs ADD COLUMN case_preposition TEXT');
-  } catch {
-    // Column already exists — safe to ignore
-  }
-  try {
-    await dbExecute(
-      `CREATE TABLE IF NOT EXISTS conjugations (
-        id         INTEGER PRIMARY KEY AUTOINCREMENT,
-        verb_id    INTEGER NOT NULL REFERENCES verbs(id) ON DELETE CASCADE,
-        form_type  TEXT NOT NULL,
-        person     TEXT NOT NULL,
-        form       TEXT NOT NULL,
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-      )`
-    );
-  } catch (e) {
-    console.error('Conjugations table migration failed:', e);
-  }
-  try {
-    await dbExecute('ALTER TABLE conjugations RENAME COLUMN tense TO form_type');
-  } catch {
-    // Already renamed — safe to ignore
-  }
-  _resolveReady();
 }

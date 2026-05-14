@@ -1,6 +1,6 @@
-export interface Section {
+export interface Subsection {
   id: number;
-  level_id: number;
+  section_id: number;
   name: string;
   position: number;
   created_at?: string;
@@ -14,10 +14,9 @@ export interface Language {
   created_at?: string;
 }
 
-export interface Level {
+export interface Section {
   id: number;
   language_id: number;
-  section_id: number | null;
   name: string;
   position: number;
   created_at?: string;
@@ -25,8 +24,8 @@ export interface Level {
 
 export interface WordPair {
   id: number;
-  level_id: number;
-  section_id: number | null;
+  section_id: number;
+  subsection_id: number | null;
   source: string;
   target: string;
   disabled?: boolean;
@@ -35,8 +34,8 @@ export interface WordPair {
 
 export interface Verb {
   id: number;
-  level_id: number;
-  section_id: number | null;
+  section_id: number;
+  subsection_id: number | null;
   infinitive_source: string;
   infinitive_target: string;
   disabled?: boolean;

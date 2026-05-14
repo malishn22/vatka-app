@@ -33,7 +33,7 @@ export const translations = {
     deleteLanguageMessage: (name: string) => `Delete "${name}"? All sections and word pairs will also be deleted.`,
 
     // Word pairs view
-    selectLevelFromSidebar: 'Select a section from the sidebar',
+    selectSectionFromSidebar: 'Select a section from the sidebar',
     wordPair: 'word pair',
     wordPairs: 'word pairs',
     needAtLeastTwoWordPairs: 'Need at least 2 word pairs to play',
@@ -75,7 +75,7 @@ export const translations = {
     importPreviewTitle: (n: number) => `Preview — ${n} pairs`,
     importToImport: (n: number) => `Import ${n} pairs`,
     importDuplicateLabel: 'Duplicate',
-    importSectionPlaceholder: 'Subsection name...',
+    importSubsectionPlaceholder: 'Subsection name...',
     importBack: 'Back',
     importChecking: 'Checking for duplicates...',
 
@@ -87,29 +87,29 @@ export const translations = {
     deleteWordPairTitle: 'Delete Word Pair',
     deleteWordPairMessage: (source: string, target: string) => `Delete "${source} → ${target}"?`,
 
-    // Sections (subsections in UI)
-    section: 'Subsection',
-    addSection: '+ Add Subsection',
-    noSectionsYet: 'No subsections yet.',
-    addSectionTitle: 'Add Subsection',
-    editSectionTitle: 'Edit Subsection',
-    sectionName: 'Subsection name',
-    sectionNamePlaceholder: 'e.g. Chapter 1, Grammar, Vocabulary',
-    deleteSectionTitle: 'Delete Subsection',
-    deleteSectionMessage: (name: string) => `Delete "${name}"? Sections in this subsection will become unsubsectioned.`,
-    unsectioned: 'No Subsection',
+    // Subsections
+    subsection: 'Subsection',
+    addSubsection: '+ Add Subsection',
+    noSubsectionsYet: 'No subsections yet.',
+    addSubsectionTitle: 'Add Subsection',
+    editSubsectionTitle: 'Edit Subsection',
+    subsectionName: 'Subsection name',
+    subsectionNamePlaceholder: 'e.g. Chapter 1, Grammar, Vocabulary',
+    deleteSubsectionTitle: 'Delete Subsection',
+    deleteSubsectionMessage: (name: string) => `Delete "${name}"? Sections in this subsection will become unsubsectioned.`,
+    unsubsectioned: 'No Subsection',
 
-    // Levels (sections in UI)
-    levels: 'SECTIONS',
-    addLevel: '+ Add Section',
-    noLevelsYet: 'No sections yet.',
-    addLevelTitle: 'Add Section',
-    editLevelTitle: 'Edit Section',
-    levelName: 'Section name',
-    levelNamePlaceholder: 'e.g. Beginner, A1, Unit 3',
+    // Sections
+    sections: 'SECTIONS',
+    addSection: '+ Add Section',
+    noSectionsYet: 'No sections yet.',
+    addSectionTitle: 'Add Section',
+    editSectionTitle: 'Edit Section',
+    sectionName: 'Section name',
+    sectionNamePlaceholder: 'e.g. Beginner, A1, Unit 3',
     nameIsRequired: 'Name is required',
-    deleteLevelTitle: 'Delete Section',
-    deleteLevelMessage: (name: string) => `Delete "${name}"? All word pairs in this section will also be deleted.`,
+    deleteSectionTitle: 'Delete Section',
+    deleteSectionMessage: (name: string) => `Delete "${name}"? All word pairs in this section will also be deleted.`,
 
     // Play view
     match: 'Match',
@@ -268,7 +268,7 @@ export const translations = {
     deleteLanguageMessage: (name: string) => `"${name}" silinsin mi? Tüm bölümler ve kelime çiftleri de silinecek.`,
 
     // Word pairs view
-    selectLevelFromSidebar: 'Kenar çubuğundan bir bölüm seçin',
+    selectSectionFromSidebar: 'Kenar çubuğundan bir bölüm seçin',
     wordPair: 'kelime çifti',
     wordPairs: 'kelime çifti',
     needAtLeastTwoWordPairs: 'Oynamak için en az 2 kelime çifti gerekli',
@@ -310,7 +310,7 @@ export const translations = {
     importPreviewTitle: (n: number) => `Önizleme — ${n} çift`,
     importToImport: (n: number) => `${n} çift içe aktar`,
     importDuplicateLabel: 'Tekrar',
-    importSectionPlaceholder: 'Alt bölüm adı...',
+    importSubsectionPlaceholder: 'Alt bölüm adı...',
     importBack: 'Geri',
     importChecking: 'Tekrarlar kontrol ediliyor...',
 
@@ -322,29 +322,29 @@ export const translations = {
     deleteWordPairTitle: 'Kelime Çiftini Sil',
     deleteWordPairMessage: (source: string, target: string) => `"${source} → ${target}" silinsin mi?`,
 
-    // Sections (alt bölümler in UI)
-    section: 'Alt Bölüm',
-    addSection: '+ Alt Bölüm Ekle',
-    noSectionsYet: 'Henüz alt bölüm yok.',
-    addSectionTitle: 'Alt Bölüm Ekle',
-    editSectionTitle: 'Alt Bölümü Düzenle',
-    sectionName: 'Alt bölüm adı',
-    sectionNamePlaceholder: 'örn. Bölüm 1, Dilbilgisi, Kelime',
-    deleteSectionTitle: 'Alt Bölümü Sil',
-    deleteSectionMessage: (name: string) => `"${name}" silinsin mi? Bu alt bölümdeki bölümler alt bölümsüz kalacak.`,
-    unsectioned: 'Alt Bölüm Yok',
+    // Subsections
+    subsection: 'Alt Bölüm',
+    addSubsection: '+ Alt Bölüm Ekle',
+    noSubsectionsYet: 'Henüz alt bölüm yok.',
+    addSubsectionTitle: 'Alt Bölüm Ekle',
+    editSubsectionTitle: 'Alt Bölümü Düzenle',
+    subsectionName: 'Alt bölüm adı',
+    subsectionNamePlaceholder: 'örn. Bölüm 1, Dilbilgisi, Kelime',
+    deleteSubsectionTitle: 'Alt Bölümü Sil',
+    deleteSubsectionMessage: (name: string) => `"${name}" silinsin mi? Bu alt bölümdeki bölümler alt bölümsüz kalacak.`,
+    unsubsectioned: 'Alt Bölüm Yok',
 
-    // Levels (bölümler in UI)
-    levels: 'BÖLÜMLER',
-    addLevel: '+ Bölüm Ekle',
-    noLevelsYet: 'Henüz bölüm yok.',
-    addLevelTitle: 'Bölüm Ekle',
-    editLevelTitle: 'Bölümü Düzenle',
-    levelName: 'Bölüm adı',
-    levelNamePlaceholder: 'örn. Başlangıç, A1, Ünite 3',
+    // Sections
+    sections: 'BÖLÜMLER',
+    addSection: '+ Bölüm Ekle',
+    noSectionsYet: 'Henüz bölüm yok.',
+    addSectionTitle: 'Bölüm Ekle',
+    editSectionTitle: 'Bölümü Düzenle',
+    sectionName: 'Bölüm adı',
+    sectionNamePlaceholder: 'örn. Başlangıç, A1, Ünite 3',
     nameIsRequired: 'Ad zorunlu',
-    deleteLevelTitle: 'Bölümü Sil',
-    deleteLevelMessage: (name: string) => `"${name}" silinsin mi? Bu bölümdeki tüm kelime çiftleri de silinecek.`,
+    deleteSectionTitle: 'Bölümü Sil',
+    deleteSectionMessage: (name: string) => `"${name}" silinsin mi? Bu bölümdeki tüm kelime çiftleri de silinecek.`,
 
     // Play view
     match: 'Eşleştir',

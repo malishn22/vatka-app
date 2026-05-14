@@ -41,15 +41,15 @@ export const createLanguageSlice: StateCreator<any, [], [], LanguageSlice> = (se
 
   deleteLanguage: async (id) => {
     await dbExecute('DELETE FROM languages WHERE id = ?', [id]);
-    set((state: any) => ({
-      languages: state.languages.filter((l: Language) => l.id !== id),
-      levels: state.levels.filter((l: any) => l.language_id !== id),
-      sections: state.sections.filter((s: any) =>
-        !state.levels.filter((l: any) => l.language_id === id).find((l: any) => l.id === s.level_id)
-      ),
-      wordPairs: state.wordPairs.filter(
-        (wp: any) => !state.levels.filter((l: any) => l.language_id === id).find((l: any) => l.id === wp.level_id)
-      ),
-    }));
+    set((state: any) => {
+      const deletedSectionIds = new Set(state.sections.filter((s: any) => s.language_id === id).map((s: any) => s.id));
+      return {
+        languages: state.languages.filter((l: Language) => l.id !== id),
+        sections: state.sections.filter((s: any) => s.language_id !== id),
+        subsections: state.subsections.filter((s: any) => !deletedSectionIds.has(s.section_id)),
+        wordPairs: state.wordPairs.filter((wp: any) => !deletedSectionIds.has(wp.section_id)),
+        verbs: state.verbs.filter((v: any) => !deletedSectionIds.has(v.section_id)),
+      };
+    });
   },
 });

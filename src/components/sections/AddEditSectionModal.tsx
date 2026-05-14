@@ -9,11 +9,11 @@ import { useT } from '../../i18n/useT';
 interface AddEditSectionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  levelId: number;
+  languageId: number;
   section?: Section;
 }
 
-export function AddEditSectionModal({ isOpen, onClose, levelId, section }: AddEditSectionModalProps) {
+export function AddEditSectionModal({ isOpen, onClose, languageId, section }: AddEditSectionModalProps) {
   const { addSection, updateSection, sections } = useDataStore();
   const t = useT();
   const [name, setName] = useState('');
@@ -31,8 +31,7 @@ export function AddEditSectionModal({ isOpen, onClose, levelId, section }: AddEd
     if (section) {
       await updateSection(section.id, { name: name.trim() });
     } else {
-      const levelSections = sections.filter((s) => s.level_id === levelId);
-      await addSection({ level_id: levelId, name: name.trim(), position: levelSections.length });
+      await addSection({ language_id: languageId, name: name.trim(), position: sections.length });
     }
     onClose();
   };

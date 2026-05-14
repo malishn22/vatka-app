@@ -15,8 +15,8 @@ import { useT } from '../../i18n/useT';
 import type { VerbWithConjugations } from '../../types';
 
 export function VerbsView() {
-  const { selectedLevelId, selectedSectionId, selectedLanguageId } = useUIStore();
-  const { levels, languages, verbs, sections, fetchVerbs } = useDataStore();
+  const { selectedSectionId, selectedSubsectionId, selectedLanguageId } = useUIStore();
+  const { sections, languages, verbs, subsections, fetchVerbs } = useDataStore();
   const { selectedVerbIds, setSelectedVerbIds } = useDragContext();
   const t = useT();
   const [addFormOpen, setAddFormOpen] = useState(false);
@@ -27,26 +27,25 @@ export function VerbsView() {
   const addFormRef = useRef<HTMLDivElement>(null);
 
   const { toggle: handleToggleVerbSelect } = useToggleSelection(selectedVerbIds, setSelectedVerbIds);
-
-  const level = levels.find((l) => l.id === selectedLevelId);
-  const language = languages.find((l) => l.id === selectedLanguageId);
-  const levelSections = sections.filter((s) => s.level_id === selectedLevelId);
-  const languageLevels = levels.filter((l) => l.language_id === selectedLanguageId);
-
-  useEffect(() => {
-    if (selectedLevelId !== null) {
-      fetchVerbs(selectedLevelId);
-    }
-  }, [selectedLevelId]);
-
   useClickOutside(addFormRef, () => setAddFormOpen(false));
 
-  const displayedVerbs = selectedSectionId !== null
-    ? verbs.filter((v) => v.section_id === selectedSectionId)
-    : verbs;
-  const showSection = selectedSectionId === null;
+  const section = sections.find((s) => s.id === selectedSectionId);
+  const language = languages.find((l) => l.id === selectedLanguageId);
+  const sectionSubsections = subsections.filter((s) => s.section_id === selectedSectionId);
+  const languageSections = sections.filter((s) => s.language_id === selectedLanguageId);
 
-  if (!level) return null;
+  useEffect(() => {
+    if (selectedSectionId !== null) {
+      fetchVerbs(selectedSectionId);
+    }
+  }, [selectedSectionId]);
+
+  const displayedVerbs = selectedSubsectionId !== null
+    ? verbs.filter((v) => v.subsection_id === selectedSubsectionId)
+    : verbs;
+  const showSection = selectedSubsectionId === null;
+
+  if (!section) return null;
 
   return (
     <div>
@@ -75,8 +74,8 @@ export function VerbsView() {
           {addFormOpen && language && (
             <div className="absolute right-0 mt-1 w-[640px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10">
               <AddVerbForm
-                levelId={level.id}
-                sectionId={selectedSectionId}
+                sectionId={section.id}
+                subsectionId={selectedSubsectionId}
                 languageId={language.id}
                 sourceLabel={language.source}
                 targetLabel={language.target}
@@ -110,7 +109,7 @@ export function VerbsView() {
               verb={verb}
               onEdit={setEditingVerb}
               showSection={showSection}
-              sectionName={sections.find((s) => s.id === verb.section_id)?.name}
+              subsectionName={subsections.find((s) => s.id === verb.subsection_id)?.name}
               isSelected={selectedVerbIds.includes(verb.id)}
               onToggleSelect={(additive) => handleToggleVerbSelect(verb.id, additive)}
             />
@@ -132,10 +131,10 @@ export function VerbsView() {
         <VerbImportModal
           isOpen={importModalOpen}
           onClose={() => setImportModalOpen(false)}
-          levelId={level.id}
+          sectionId={section.id}
           language={language}
-          sections={levelSections}
-          levels={languageLevels}
+          subsections={sectionSubsections}
+          sections={languageSections}
           sourceLabel={language.source}
           targetLabel={language.target}
           onImported={(count, skipped) => {
@@ -151,9 +150,9 @@ export function VerbsView() {
           onClose={() => setExportFormat(null)}
           format={exportFormat}
           language={language}
-          levels={languageLevels}
-          currentLevelId={level.id}
-          sections={levelSections}
+          sections={languageSections}
+          currentSectionId={section.id}
+          subsections={sectionSubsections}
           verbs={verbs}
           onSuccess={() => setToastMsg(t.exportedSuccessfully)}
         />

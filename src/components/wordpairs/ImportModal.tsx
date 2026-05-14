@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Modal } from '../shared/Modal';
 import { Button } from '../shared/Button';
-import type { Section, Language, Level } from '../../types';
+import type { Subsection, Language, Section } from '../../types';
 import { useExcelImport, type ParsedSpreadsheetResult } from '../../hooks/useExcelImport';
 import { useDataStore } from '../../store/dataStore';
 import { useT } from '../../i18n/useT';
-import { createResolutionCtx, resolveTargetLevel, resolveSubsection } from '../../utils/importResolution';
+import { createResolutionCtx, resolveTargetSection, resolveSubsection } from '../../utils/importResolution';
 
 interface ImportRow {
   id: string;
@@ -34,10 +34,10 @@ interface ImportVerbRow {
 interface ImportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  levelId: number;
+  sectionId: number;
   language: Language;
+  subsections: Subsection[];
   sections: Section[];
-  levels: Level[];
   sourceLabel: string;
   targetLabel: string;
   onImported: (count: number, skipped: number) => void;
@@ -47,17 +47,17 @@ interface ImportModalProps {
 export function ImportModal({
   isOpen,
   onClose,
-  levelId,
+  sectionId,
   language,
+  subsections,
   sections,
-  levels,
   sourceLabel,
   targetLabel,
   onImported,
   mode = 'both',
 }: ImportModalProps) {
   const t = useT();
-  const { addWordPair, addVerb, addSection, addLevel, wordPairExistsInLanguage, verbExistsInLanguage, fetchWordPairs, fetchVerbs } = useDataStore();
+  const { addWordPair, addVerb, addSubsection, addSection, wordPairExistsInLanguage, verbExistsInLanguage, fetchWordPairs, fetchVerbs } = useDataStore();
 
   const [step, setStep] = useState<'select-file' | 'preview'>('select-file');
   const [rows, setRows] = useState<ImportRow[]>([]);
@@ -158,23 +158,23 @@ export function ImportModal({
       const ctx = createResolutionCtx(
         language.id,
         language.name,
-        levelId,
-        levels,
+        sectionId,
         sections,
-        addLevel,
+        subsections,
         addSection,
-        () => useDataStore.getState().levels,
+        addSubsection,
         () => useDataStore.getState().sections,
+        () => useDataStore.getState().subsections,
       );
 
-      const writtenLevelIds = new Set<number>();
+      const writtenSectionIds = new Set<number>();
 
       for (const row of rows) {
         if (row.isDuplicate) { skipped++; continue; }
-        const targetLevelId = await resolveTargetLevel(row.sectionName, ctx);
-        const resolvedSubId = await resolveSubsection(row.subsectionName, targetLevelId, ctx);
-        await addWordPair({ level_id: targetLevelId, section_id: resolvedSubId, source: row.source, target: row.target, disabled: row.disabled });
-        writtenLevelIds.add(targetLevelId);
+        const targetSectionId = await resolveTargetSection(row.sectionName, ctx);
+        const resolvedSubId = await resolveSubsection(row.subsectionName, targetSectionId, ctx);
+        await addWordPair({ section_id: targetSectionId, subsection_id: resolvedSubId, source: row.source, target: row.target, disabled: row.disabled });
+        writtenSectionIds.add(targetSectionId);
         imported++;
       }
 
@@ -182,12 +182,12 @@ export function ImportModal({
       let verbsSkipped = 0;
       for (const vRow of verbRows) {
         if (vRow.isDuplicate) { verbsSkipped++; continue; }
-        const targetLevelId = await resolveTargetLevel(vRow.sectionName, ctx);
-        const resolvedSubId = await resolveSubsection(vRow.subsectionName, targetLevelId, ctx);
+        const targetSectionId = await resolveTargetSection(vRow.sectionName, ctx);
+        const resolvedSubId = await resolveSubsection(vRow.subsectionName, targetSectionId, ctx);
         await addVerb(
           {
-            level_id: targetLevelId,
-            section_id: resolvedSubId,
+            section_id: targetSectionId,
+            subsection_id: resolvedSubId,
             infinitive_source: vRow.infinitive_source,
             infinitive_target: vRow.infinitive_target,
             disabled: vRow.disabled,
@@ -196,13 +196,13 @@ export function ImportModal({
           },
           vRow.conjugations,
         );
-        writtenLevelIds.add(targetLevelId);
+        writtenSectionIds.add(targetSectionId);
         verbsImported++;
       }
 
-      for (const lvlId of writtenLevelIds) {
-        await fetchWordPairs(lvlId);
-        await fetchVerbs(lvlId);
+      for (const secId of writtenSectionIds) {
+        await fetchWordPairs(secId);
+        await fetchVerbs(secId);
       }
 
       setIsImporting(false);
@@ -219,8 +219,8 @@ export function ImportModal({
   const verbsToImportCount = verbRows.filter(r => !r.isDuplicate).length;
   const verbDuplicateCount = verbRows.filter(r => r.isDuplicate).length;
   const totalToImport = toImportCount + verbsToImportCount;
-  const existingSubsectionNames = sections.map(s => s.name);
-  const levelNames = levels.map(l => l.name);
+  const existingSubsectionNames = subsections.map(s => s.name);
+  const sectionNames = sections.map(s => s.name);
 
   const isVerbMode = mode === 'verb';
   const modalTitle = isVerbMode ? t.importVerbs : t.importExcel;
@@ -268,7 +268,7 @@ export function ImportModal({
     </>
   );
 
-  const datalistId = isVerbMode ? 'verb-import-level-datalist' : 'import-level-datalist';
+  const datalistId = isVerbMode ? 'verb-import-section-datalist' : 'import-section-datalist';
   const subsectionDatalistId = isVerbMode ? 'verb-import-subsection-datalist' : 'import-subsection-datalist';
 
   return (
@@ -283,7 +283,7 @@ export function ImportModal({
           <p className="text-xs text-red-600 dark:text-red-400">Import failed: {importError}</p>
         )}
         <datalist id={datalistId}>
-          {levelNames.map(name => <option key={name} value={name} />)}
+          {sectionNames.map(name => <option key={name} value={name} />)}
         </datalist>
         <datalist id={subsectionDatalistId}>
           {existingSubsectionNames.map(name => <option key={name} value={name} />)}
@@ -321,7 +321,7 @@ export function ImportModal({
                             list={datalistId}
                             value={row.sectionName}
                             onChange={e => updateRowSection(row.id, e.target.value)}
-                            placeholder={levels.find(l => l.id === levelId)?.name ?? ''}
+                            placeholder={sections.find(s => s.id === sectionId)?.name ?? ''}
                             className="w-full text-xs px-2 py-1 rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-400"
                           />
                         )}
@@ -335,7 +335,7 @@ export function ImportModal({
                             list={subsectionDatalistId}
                             value={row.subsectionName}
                             onChange={e => updateRowSubsection(row.id, e.target.value)}
-                            placeholder={t.importSectionPlaceholder}
+                            placeholder={t.importSubsectionPlaceholder}
                             className="w-full text-xs px-2 py-1 rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-400"
                           />
                         )}
@@ -393,7 +393,7 @@ export function ImportModal({
                             list={datalistId}
                             value={vRow.sectionName}
                             onChange={e => updateVerbRowSection(vRow.id, e.target.value)}
-                            placeholder={levels.find(l => l.id === levelId)?.name ?? ''}
+                            placeholder={sections.find(s => s.id === sectionId)?.name ?? ''}
                             className="w-full text-xs px-2 py-1 rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-400"
                           />
                         )}
@@ -407,7 +407,7 @@ export function ImportModal({
                             list={subsectionDatalistId}
                             value={vRow.subsectionName}
                             onChange={e => updateVerbRowSubsection(vRow.id, e.target.value)}
-                            placeholder={t.importSectionPlaceholder}
+                            placeholder={t.importSubsectionPlaceholder}
                             className="w-full text-xs px-2 py-1 rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-400"
                           />
                         )}

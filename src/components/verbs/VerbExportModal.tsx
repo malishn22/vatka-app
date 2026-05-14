@@ -1,22 +1,22 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Modal } from '../shared/Modal';
 import { Button } from '../shared/Button';
-import type { Level, Language, Section, VerbWithConjugations } from '../../types';
-import { useExcelExport, fetchVerbsRaw, fetchSectionsRaw, type ExportPayload } from '../../hooks/useExcelExport';
+import type { Section, Language, Subsection, VerbWithConjugations } from '../../types';
+import { useExcelExport, fetchVerbsRaw, fetchSubsectionsRaw, type ExportPayload } from '../../hooks/useExcelExport';
 import { useT } from '../../i18n/useT';
-import { LevelMultiSelect } from '../shared/LevelMultiSelect';
+import { SectionMultiSelect } from '../shared/SectionMultiSelect';
 
 type ExportFormat = 'xlsx' | 'csv';
-type ExportStep = 'select-levels' | 'select-verbs';
+type ExportStep = 'select-sections' | 'select-verbs';
 
 interface VerbExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   format: ExportFormat;
   language: Language;
-  levels: Level[];
-  currentLevelId: number;
   sections: Section[];
+  currentSectionId: number;
+  subsections: Subsection[];
   verbs: VerbWithConjugations[];
   onSuccess: () => void;
 }
@@ -26,17 +26,17 @@ export function VerbExportModal({
   onClose,
   format,
   language,
-  levels,
-  currentLevelId,
   sections,
+  currentSectionId,
+  subsections,
   verbs,
   onSuccess,
 }: VerbExportModalProps) {
   const t = useT();
-  const currentLevel = levels.find(l => l.id === currentLevelId);
+  const currentSection = sections.find(s => s.id === currentSectionId);
 
-  const [step, setStep] = useState<ExportStep>('select-levels');
-  const [selectedLevelIds, setSelectedLevelIds] = useState<Set<number>>(new Set());
+  const [step, setStep] = useState<ExportStep>('select-sections');
+  const [selectedSectionIds, setSelectedSectionIds] = useState<Set<number>>(new Set());
 
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -44,22 +44,22 @@ export function VerbExportModal({
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [allVerbs, setAllVerbs] = useState<VerbWithConjugations[]>([]);
-  const [allSubsections, setAllSubsections] = useState<Section[]>([]);
+  const [allSubsections, setAllSubsections] = useState<Subsection[]>([]);
 
   useEffect(() => {
     if (isOpen) {
-      setStep('select-levels');
-      setSelectedLevelIds(new Set(levels.map(l => l.id)));
+      setStep('select-sections');
+      setSelectedSectionIds(new Set(sections.map(s => s.id)));
       setSearch('');
       setSelectedIds(new Set());
       setExportError(null);
       setAllVerbs([]);
       setAllSubsections([]);
     }
-  }, [isOpen, levels]);
+  }, [isOpen, sections]);
 
-  const toggleLevel = (id: number) => {
-    setSelectedLevelIds(prev => {
+  const toggleSection = (id: number) => {
+    setSelectedSectionIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -71,16 +71,16 @@ export function VerbExportModal({
     setIsLoading(true);
     try {
       const combinedVerbs: VerbWithConjugations[] = [];
-      const combinedSubsections: Section[] = [];
+      const combinedSubsections: Subsection[] = [];
       const seenSubsectionIds = new Set<number>();
 
-      for (const lv of levels) {
-        if (!selectedLevelIds.has(lv.id)) continue;
+      for (const sec of sections) {
+        if (!selectedSectionIds.has(sec.id)) continue;
 
-        const lvVerbs = lv.id === currentLevelId ? verbs : await fetchVerbsRaw(lv.id);
-        combinedVerbs.push(...lvVerbs);
+        const secVerbs = sec.id === currentSectionId ? verbs : await fetchVerbsRaw(sec.id);
+        combinedVerbs.push(...secVerbs);
 
-        const subs = lv.id === currentLevelId ? sections : await fetchSectionsRaw(lv.id);
+        const subs = sec.id === currentSectionId ? subsections : await fetchSubsectionsRaw(sec.id);
         for (const sub of subs) {
           if (!seenSubsectionIds.has(sub.id)) {
             combinedSubsections.push(sub);
@@ -103,9 +103,9 @@ export function VerbExportModal({
     [allSubsections]
   );
 
-  const levelMap = useMemo(
-    () => new Map<number, string>(levels.map(l => [l.id, l.name])),
-    [levels]
+  const sectionMap = useMemo(
+    () => new Map<number, string>(sections.map(s => [s.id, s.name])),
+    [sections]
   );
 
   const filteredVerbs = useMemo(() => {
@@ -145,8 +145,8 @@ export function VerbExportModal({
 
   const { exportXlsx, exportCsv } = useExcelExport({
     wordPairs: [],
-    sections,
-    level: currentLevel ?? levels[0],
+    subsections,
+    section: currentSection ?? sections[0],
     language,
     onSuccess: () => {
       onSuccess();
@@ -159,17 +159,17 @@ export function VerbExportModal({
     setExportError(null);
     try {
       const selectedVerbs = allVerbs.filter(v => selectedIds.has(v.id));
-      const referencedLevelIds = new Set(selectedVerbs.map(v => v.level_id));
+      const referencedSectionIds = new Set(selectedVerbs.map(v => v.section_id));
       const referencedSubsectionIds = new Set(
-        selectedVerbs.map(v => v.section_id).filter((id): id is number => id !== null)
+        selectedVerbs.map(v => v.subsection_id).filter((id): id is number => id !== null)
       );
-      const filteredLevels = levels.filter(l => referencedLevelIds.has(l.id));
+      const filteredSections = sections.filter(s => referencedSectionIds.has(s.id));
       const filteredSubsections = allSubsections.filter(s => referencedSubsectionIds.has(s.id));
       const payload: ExportPayload = {
         wordPairs: [],
-        sections: filteredSubsections,
-        levels: filteredLevels,
-        fileLabel: filteredLevels.length === 1 ? filteredLevels[0].name : language.name,
+        subsections: filteredSubsections,
+        sections: filteredSections,
+        fileLabel: filteredSections.length === 1 ? filteredSections[0].name : language.name,
         verbs: selectedVerbs,
       };
       if (format === 'xlsx') await exportXlsx(payload);
@@ -181,12 +181,12 @@ export function VerbExportModal({
     }
   };
 
-  // Step 1: Select Levels
-  if (step === 'select-levels') {
+  // Step 1: Select Sections
+  if (step === 'select-sections') {
     const footer = (
       <>
         <Button variant="secondary" onClick={onClose} disabled={isLoading}>{t.cancel}</Button>
-        <Button variant="primary" onClick={handleNext} disabled={isLoading || selectedLevelIds.size === 0}>
+        <Button variant="primary" onClick={handleNext} disabled={isLoading || selectedSectionIds.size === 0}>
           {isLoading ? '...' : 'Next →'}
         </Button>
       </>
@@ -196,11 +196,11 @@ export function VerbExportModal({
       <Modal isOpen={isOpen} onClose={onClose} title={t.exportVerbs} footer={footer}>
         <div className="flex flex-col gap-3">
           <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.exportScope}</p>
-          <LevelMultiSelect
-            levels={levels}
-            selectedLevelIds={selectedLevelIds}
-            currentLevelId={currentLevelId}
-            onToggle={toggleLevel}
+          <SectionMultiSelect
+            sections={sections}
+            selectedSectionIds={selectedSectionIds}
+            currentSectionId={currentSectionId}
+            onToggle={toggleSection}
           />
         </div>
       </Modal>
@@ -208,10 +208,10 @@ export function VerbExportModal({
   }
 
   // Step 2: Select Verbs
-  const showSectionCol = selectedLevelIds.size > 1;
+  const showSectionCol = selectedSectionIds.size > 1;
   const footer = (
     <>
-      <Button variant="secondary" onClick={() => setStep('select-levels')} disabled={isExporting}>
+      <Button variant="secondary" onClick={() => setStep('select-sections')} disabled={isExporting}>
         ← Back
       </Button>
       <Button variant="primary" onClick={handleExport} disabled={isExporting || selectedIds.size === 0}>
@@ -265,8 +265,8 @@ export function VerbExportModal({
             <table className="w-full text-sm border-collapse">
               <tbody>
                 {filteredVerbs.map(verb => {
-                  const subsecName = verb.section_id != null ? subsectionMap.get(verb.section_id) : undefined;
-                  const secName = levelMap.get(verb.level_id);
+                  const subsecName = verb.subsection_id != null ? subsectionMap.get(verb.subsection_id) : undefined;
+                  const secName = sectionMap.get(verb.section_id);
                   return (
                     <tr
                       key={verb.id}

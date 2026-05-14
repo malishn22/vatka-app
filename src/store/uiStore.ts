@@ -11,8 +11,8 @@ export type ContentTab = 'wordpairs' | 'verbs';
 interface UIState {
   currentView: View;
   selectedLanguageId: number | null;
-  selectedLevelId: number | null;
   selectedSectionId: number | null;
+  selectedSubsectionId: number | null;
   isDark: boolean;
   lang: Lang;
   favoriteLanguages: string[];
@@ -25,8 +25,8 @@ interface UIState {
   contentTab: ContentTab;
   setView: (view: View) => void;
   setSelectedLanguage: (id: number | null) => void;
-  setSelectedLevel: (id: number | null) => void;
   setSelectedSection: (id: number | null) => void;
+  setSelectedSubsection: (id: number | null) => void;
   toggleDark: () => void;
   setLang: (lang: Lang) => void;
   toggleFavoriteLanguage: (lang: string) => void;
@@ -44,8 +44,8 @@ export const useUIStore = create<UIState>()(
     (set, get) => ({
       currentView: 'languages',
       selectedLanguageId: null,
-      selectedLevelId: null,
       selectedSectionId: null,
+      selectedSubsectionId: null,
       isDark: true,
       lang: 'en',
       favoriteLanguages: [],
@@ -57,9 +57,9 @@ export const useUIStore = create<UIState>()(
       conjugationOptionCount: 4,
       contentTab: 'wordpairs',
       setView: (view) => set({ currentView: view }),
-      setSelectedLanguage: (id) => set({ selectedLanguageId: id, selectedLevelId: null, selectedSectionId: null, currentView: id ? 'wordpairs' : 'languages' }),
-      setSelectedLevel: (id) => set({ selectedLevelId: id, selectedSectionId: null, currentView: id ? 'wordpairs' : 'languages' }),
-      setSelectedSection: (id) => set({ selectedSectionId: id }),
+      setSelectedLanguage: (id) => set({ selectedLanguageId: id, selectedSectionId: null, selectedSubsectionId: null, currentView: id ? 'wordpairs' : 'languages' }),
+      setSelectedSection: (id) => set({ selectedSectionId: id, selectedSubsectionId: null, currentView: id ? 'wordpairs' : 'languages' }),
+      setSelectedSubsection: (id) => set({ selectedSubsectionId: id }),
       toggleDark: () => set((state) => {
         const next = !state.isDark;
         document.documentElement.classList.toggle('dark', next);
