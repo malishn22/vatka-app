@@ -2,9 +2,8 @@ import { save } from '@tauri-apps/plugin-dialog';
 import { writeFile } from '@tauri-apps/plugin-fs';
 import type { WordPair, Section, Level, Language, Verb, Conjugation, VerbWithConjugations } from '../types';
 import { dbSelect } from '../db/client';
-
-const isTauriRuntime = () =>
-  typeof window !== 'undefined' && typeof (window as any).__TAURI_INTERNALS__ !== 'undefined';
+import { isTauriRuntime } from '../utils/tauri';
+import { toBool } from '../utils/dbMapper';
 
 async function tauriInvoke<T>(command: string, args: Record<string, unknown>): Promise<T> {
   const mod = await import('@tauri-apps/api/core');
@@ -32,7 +31,7 @@ export async function fetchWordPairsRaw(levelId: number): Promise<WordPair[]> {
     'SELECT * FROM word_pairs WHERE level_id = ? ORDER BY id',
     [levelId]
   );
-  return rows.map(r => ({ ...r, disabled: Boolean(r.disabled) }));
+  return rows.map(r => ({ ...r, disabled: toBool(r.disabled) }));
 }
 
 export async function fetchSectionsRaw(levelId: number): Promise<Section[]> {
@@ -53,7 +52,7 @@ export async function fetchVerbsRaw(levelId: number): Promise<VerbWithConjugatio
   );
   return verbRows.map(v => ({
     ...v,
-    disabled: Boolean(v.disabled),
+    disabled: toBool(v.disabled),
     conjugations: conjugationRows.filter(c => c.verb_id === v.id),
   }));
 }
@@ -94,7 +93,7 @@ export function useExcelExport({ wordPairs, sections, level, language, onSuccess
           infinitive_target: v.infinitive_target,
           level_id: v.level_id,
           section_id: v.section_id,
-          disabled: Boolean(v.disabled),
+          disabled: toBool(v.disabled),
           auxiliary: v.auxiliary ?? null,
           case_preposition: v.case_preposition ?? null,
           conjugations: v.conjugations.map(c => ({

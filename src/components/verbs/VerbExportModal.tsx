@@ -4,6 +4,7 @@ import { Button } from '../shared/Button';
 import type { Level, Language, Section, VerbWithConjugations } from '../../types';
 import { useExcelExport, fetchVerbsRaw, fetchSectionsRaw, type ExportPayload } from '../../hooks/useExcelExport';
 import { useT } from '../../i18n/useT';
+import { LevelMultiSelect } from '../shared/LevelMultiSelect';
 
 type ExportFormat = 'xlsx' | 'csv';
 type ExportStep = 'select-levels' | 'select-verbs';
@@ -195,24 +196,12 @@ export function VerbExportModal({
       <Modal isOpen={isOpen} onClose={onClose} title={t.exportVerbs} footer={footer}>
         <div className="flex flex-col gap-3">
           <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.exportScope}</p>
-          <div className="flex flex-col gap-1.5">
-            {levels.map(lv => (
-              <label key={lv.id} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selectedLevelIds.has(lv.id)}
-                  onChange={() => toggleLevel(lv.id)}
-                  className="accent-indigo-500"
-                />
-                <span className="text-sm text-gray-800 dark:text-gray-200">
-                  {lv.name}
-                  {lv.id === currentLevelId && (
-                    <span className="ml-1.5 text-xs text-gray-400 dark:text-gray-500">(current)</span>
-                  )}
-                </span>
-              </label>
-            ))}
-          </div>
+          <LevelMultiSelect
+            levels={levels}
+            selectedLevelIds={selectedLevelIds}
+            currentLevelId={currentLevelId}
+            onToggle={toggleLevel}
+          />
         </div>
       </Modal>
     );

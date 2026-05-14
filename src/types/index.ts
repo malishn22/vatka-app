@@ -57,3 +57,13 @@ export interface Conjugation {
 export interface VerbWithConjugations extends Verb {
   conjugations: Conjugation[];
 }
+
+export interface ConjugationEntry {
+  person: string;
+  form: string;
+}
+
+export interface FormTypeGroup {
+  formType: string;
+  entries: ConjugationEntry[];
+}

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { useClickOutside } from '../../hooks/useClickOutside';
+import { useToggleSelection } from '../../hooks/useToggleSelection';
 import { useUIStore } from '../../store/uiStore';
 import { useDataStore } from '../../store/dataStore';
 import { usePlayStore } from '../../store/playStore';
@@ -31,27 +33,8 @@ export function WordPairsView() {
   const [playModalOpen, setPlayModalOpen] = useState(false);
   const addFormRef = useRef<HTMLDivElement>(null);
 
-  const handleTogglePairSelect = (id: number, additive: boolean) => {
-    if (additive) {
-      setSelectedPairIds(
-        selectedPairIds.includes(id)
-          ? selectedPairIds.filter((x) => x !== id)
-          : [...selectedPairIds, id]
-      );
-    } else {
-      setSelectedPairIds(selectedPairIds.length === 1 && selectedPairIds[0] === id ? [] : [id]);
-    }
-  };
-
-  useEffect(() => {
-    function handleMouseDown(e: MouseEvent) {
-      if (addFormRef.current && !addFormRef.current.contains(e.target as Node)) {
-        setAddFormOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleMouseDown);
-    return () => document.removeEventListener('mousedown', handleMouseDown);
-  }, []);
+  const { toggle: handleTogglePairSelect } = useToggleSelection(selectedPairIds, setSelectedPairIds);
+  useClickOutside(addFormRef, () => setAddFormOpen(false));
 
   const level = levels.find((l) => l.id === selectedLevelId);
   const language = languages.find((l) => l.id === selectedLanguageId);

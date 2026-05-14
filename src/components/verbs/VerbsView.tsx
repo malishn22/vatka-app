@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { useClickOutside } from '../../hooks/useClickOutside';
+import { useToggleSelection } from '../../hooks/useToggleSelection';
 import { useUIStore } from '../../store/uiStore';
 import { useDataStore } from '../../store/dataStore';
 import { useDragContext } from '../../context/DragContext';
@@ -24,17 +26,7 @@ export function VerbsView() {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const addFormRef = useRef<HTMLDivElement>(null);
 
-  const handleToggleVerbSelect = (id: number, additive: boolean) => {
-    if (additive) {
-      setSelectedVerbIds(
-        selectedVerbIds.includes(id)
-          ? selectedVerbIds.filter((x) => x !== id)
-          : [...selectedVerbIds, id]
-      );
-    } else {
-      setSelectedVerbIds(selectedVerbIds.length === 1 && selectedVerbIds[0] === id ? [] : [id]);
-    }
-  };
+  const { toggle: handleToggleVerbSelect } = useToggleSelection(selectedVerbIds, setSelectedVerbIds);
 
   const level = levels.find((l) => l.id === selectedLevelId);
   const language = languages.find((l) => l.id === selectedLanguageId);
@@ -47,19 +39,7 @@ export function VerbsView() {
     }
   }, [selectedLevelId]);
 
-  useEffect(() => {
-    function handleMouseDown(e: MouseEvent) {
-      setTimeout(() => {
-        const target = e.target as Node;
-        if (!document.contains(target)) return;
-        if (addFormRef.current && !addFormRef.current.contains(target)) {
-          setAddFormOpen(false);
-        }
-      }, 0);
-    }
-    document.addEventListener('mousedown', handleMouseDown);
-    return () => document.removeEventListener('mousedown', handleMouseDown);
-  }, []);
+  useClickOutside(addFormRef, () => setAddFormOpen(false));
 
   const displayedVerbs = selectedSectionId !== null
     ? verbs.filter((v) => v.section_id === selectedSectionId)

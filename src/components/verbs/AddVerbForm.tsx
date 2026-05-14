@@ -3,18 +3,9 @@ import { useDataStore } from '../../store/dataStore';
 import { Button } from '../shared/Button';
 import { Input } from '../shared/Input';
 import { useT } from '../../i18n/useT';
-import { TrashIcon } from '../shared/Icons';
 import { usePairedPaste } from '../../hooks/usePairedPaste';
-
-interface ConjugationEntry {
-  person: string;
-  form: string;
-}
-
-interface FormTypeGroup {
-  formType: string;
-  entries: ConjugationEntry[];
-}
+import { VerbFormEditor } from './VerbFormEditor';
+import type { FormTypeGroup } from '../../types';
 
 interface AddVerbFormProps {
   levelId: number;
@@ -40,7 +31,6 @@ export function AddVerbForm({ levelId, sectionId, languageId, sourceLabel, targe
   const [usedPersons, setUsedPersons] = useState<string[]>([]);
   const [showFormTypeSuggestions, setShowFormTypeSuggestions] = useState<number | null>(null);
 
-  // Refs for focus management
   const sourceRef = useRef<HTMLInputElement>(null);
   const targetRef = useRef<HTMLInputElement>(null);
   const formTypeRefs = useRef<Record<number, HTMLInputElement | null>>({});
@@ -53,53 +43,46 @@ export function AddVerbForm({ levelId, sectionId, languageId, sourceLabel, targe
     fetchUsedPersons(languageId).then(setUsedPersons);
   }, [languageId]);
 
-  // Handle pending focus after state updates
   useEffect(() => {
     if (pendingFocusRef.current) {
       const { type, key } = pendingFocusRef.current;
       pendingFocusRef.current = null;
       setTimeout(() => {
-        if (type === 'form') {
-          formRefs.current[key]?.focus();
-        } else {
-          personRefs.current[key]?.focus();
-        }
+        if (type === 'form') formRefs.current[key]?.focus();
+        else personRefs.current[key]?.focus();
       }, 0);
     }
   }, [formTypeGroups]);
 
-  // Paired paste for infinitive inputs
   const handleInfinitivePaste = usePairedPaste((left, right) => {
     setInfinitiveSource(left);
     setInfinitiveTarget(right);
     setError('');
   }, targetRef);
 
-  const updateFormType = (groupIdx: number, formType: string) => {
-    setFormTypeGroups((prev) => prev.map((g, i) => i === groupIdx ? { ...g, formType } : g));
+  const updateFormType = (gi: number, formType: string) => {
+    setFormTypeGroups((prev) => prev.map((g, i) => i === gi ? { ...g, formType } : g));
   };
 
-  const updateEntry = (groupIdx: number, entryIdx: number, field: 'person' | 'form', value: string) => {
-    setFormTypeGroups((prev) => prev.map((g, gi) =>
-      gi === groupIdx
-        ? { ...g, entries: g.entries.map((e, ei) => ei === entryIdx ? { ...e, [field]: value } : e) }
+  const updateEntry = (gi: number, ei: number, field: 'person' | 'form', value: string) => {
+    setFormTypeGroups((prev) => prev.map((g, gi2) =>
+      gi2 === gi
+        ? { ...g, entries: g.entries.map((e, ei2) => ei2 === ei ? { ...e, [field]: value } : e) }
         : g
     ));
   };
 
-  const addEntry = (groupIdx: number) => {
-    const newEntryIdx = formTypeGroups[groupIdx].entries.length;
-    pendingFocusRef.current = { type: 'person', key: `${groupIdx}-${newEntryIdx}` };
+  const addEntry = (gi: number) => {
+    const newEntryIdx = formTypeGroups[gi].entries.length;
+    pendingFocusRef.current = { type: 'person', key: `${gi}-${newEntryIdx}` };
     setFormTypeGroups((prev) => prev.map((g, i) =>
-      i === groupIdx ? { ...g, entries: [...g.entries, { person: '', form: '' }] } : g
+      i === gi ? { ...g, entries: [...g.entries, { person: '', form: '' }] } : g
     ));
   };
 
-  const removeEntry = (groupIdx: number, entryIdx: number) => {
-    setFormTypeGroups((prev) => prev.map((g, gi) =>
-      gi === groupIdx
-        ? { ...g, entries: g.entries.filter((_, ei) => ei !== entryIdx) }
-        : g
+  const removeEntry = (gi: number, ei: number) => {
+    setFormTypeGroups((prev) => prev.map((g, gi2) =>
+      gi2 === gi ? { ...g, entries: g.entries.filter((_, ei2) => ei2 !== ei) } : g
     ));
   };
 
@@ -107,33 +90,31 @@ export function AddVerbForm({ levelId, sectionId, languageId, sourceLabel, targe
     setFormTypeGroups((prev) => [...prev, { formType: '', entries: [{ person: '', form: '' }] }]);
   };
 
-  const removeFormTypeGroup = (groupIdx: number) => {
-    setFormTypeGroups((prev) => prev.filter((_, i) => i !== groupIdx));
+  const removeFormTypeGroup = (gi: number) => {
+    setFormTypeGroups((prev) => prev.filter((_, i) => i !== gi));
   };
 
-  const fillPersons = (groupIdx: number) => {
-    const group = formTypeGroups[groupIdx];
+  const fillPersons = (gi: number) => {
+    const group = formTypeGroups[gi];
     const existingPersons = new Set(group.entries.map((e) => e.person.trim().toLowerCase()).filter(Boolean));
     const missingPersons = usedPersons.filter((p) => !existingPersons.has(p.toLowerCase()));
     if (missingPersons.length === 0) return;
 
     const nonEmptyEntries = group.entries.filter((e) => e.person.trim() || e.form.trim());
-    const newEntries = [
+    const finalEntries = [
       ...nonEmptyEntries,
       ...missingPersons.map((p) => ({ person: p, form: '' })),
     ];
-    const finalEntries = newEntries.length > 0 ? newEntries : missingPersons.map((p) => ({ person: p, form: '' }));
 
     const firstEmptyFormIdx = finalEntries.findIndex((e) => !e.form.trim());
     if (firstEmptyFormIdx >= 0) {
-      pendingFocusRef.current = { type: 'form', key: `${groupIdx}-${firstEmptyFormIdx}` };
+      pendingFocusRef.current = { type: 'form', key: `${gi}-${firstEmptyFormIdx}` };
     }
-
-    setFormTypeGroups((prev) => prev.map((g, i) => i === groupIdx ? { ...g, entries: finalEntries } : g));
+    setFormTypeGroups((prev) => prev.map((g, i) => i === gi ? { ...g, entries: finalEntries } : g));
   };
 
-  const getMissingPersonCount = (groupIdx: number) => {
-    const group = formTypeGroups[groupIdx];
+  const getMissingPersonCount = (gi: number) => {
+    const group = formTypeGroups[gi];
     const existingPersons = new Set(group.entries.map((e) => e.person.trim().toLowerCase()).filter(Boolean));
     return usedPersons.filter((p) => !existingPersons.has(p.toLowerCase())).length;
   };
@@ -188,10 +169,6 @@ export function AddVerbForm({ levelId, sectionId, languageId, sourceLabel, targe
     onAdded?.();
   };
 
-  const filteredFormTypes = (query: string) =>
-    usedFormTypes.filter((ft) => ft.toLowerCase().includes(query.toLowerCase()) && ft.toLowerCase() !== query.toLowerCase());
-
-  // Paired paste handler for person/form rows
   const handleEntryPaste = (gi: number, ei: number, e: React.ClipboardEvent<HTMLInputElement>) => {
     const text = e.clipboardData.getData('text').trim();
     const separators = [' - ', ' / ', '/', '-'];
@@ -222,7 +199,6 @@ export function AddVerbForm({ levelId, sectionId, languageId, sourceLabel, targe
     <div className="p-4">
       <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">{t.addVerb}</p>
 
-      {/* Infinitive inputs */}
       <div className="flex gap-3 mb-4">
         <div className="flex-1">
           <Input
@@ -248,7 +224,6 @@ export function AddVerbForm({ levelId, sectionId, languageId, sourceLabel, targe
         </div>
       </div>
 
-      {/* Auxiliary + Case/Preposition */}
       <div className="flex gap-3 mb-4">
         <div className="flex-1">
           <Input
@@ -268,94 +243,31 @@ export function AddVerbForm({ levelId, sectionId, languageId, sourceLabel, targe
         </div>
       </div>
 
-      {/* Form type groups */}
       <div className="max-h-[40vh] overflow-y-auto">
-        {formTypeGroups.map((group, gi) => (
-          <div key={gi} className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="flex-1 relative">
-                <Input
-                  ref={(el) => { formTypeRefs.current[gi] = el; }}
-                  inputSize="sm"
-                  placeholder={t.formTypeName}
-                  value={group.formType}
-                  onChange={(e) => { updateFormType(gi, e.target.value); setShowFormTypeSuggestions(gi); }}
-                  onFocus={() => setShowFormTypeSuggestions(gi)}
-                  onBlur={() => setTimeout(() => setShowFormTypeSuggestions(null), 150)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') personRefs.current[`${gi}-0`]?.focus(); }}
-                />
-                {showFormTypeSuggestions === gi && group.formType && filteredFormTypes(group.formType).length > 0 && (
-                  <div className="absolute z-10 top-full mt-1 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded shadow-lg max-h-32 overflow-y-auto">
-                    {filteredFormTypes(group.formType).map((ft) => (
-                      <button key={ft} className="w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200"
-                        onMouseDown={() => { updateFormType(gi, ft); setShowFormTypeSuggestions(null); }}>
-                        {ft}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {formTypeGroups.length > 1 && (
-                <Button variant="icon" hoverColor="red" onClick={() => removeFormTypeGroup(gi)} title={t.delete}>
-                  <TrashIcon size={16} />
-                </Button>
-              )}
-            </div>
-
-            {/* Person/form entries */}
-            {group.entries.map((entry, ei) => (
-              <div key={ei} className="flex items-center gap-2 mb-1.5">
-                <div className="flex-1">
-                  <Input
-                    ref={(el) => { personRefs.current[`${gi}-${ei}`] = el; }}
-                    inputSize="sm"
-                    placeholder={t.person}
-                    value={entry.person}
-                    onChange={(e) => updateEntry(gi, ei, 'person', e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') formRefs.current[`${gi}-${ei}`]?.focus(); }}
-                    onPaste={(e) => handleEntryPaste(gi, ei, e)}
-                  />
-                </div>
-                <div className="flex-1">
-                  <Input
-                    ref={(el) => { formRefs.current[`${gi}-${ei}`] = el; }}
-                    inputSize="sm"
-                    placeholder={t.conjugatedForm}
-                    value={entry.form}
-                    onChange={(e) => updateEntry(gi, ei, 'form', e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addEntry(gi);
-                      }
-                    }}
-                  />
-                </div>
-                {group.entries.length > 1 && (
-                  <Button variant="icon" hoverColor="red" onClick={() => removeEntry(gi, ei)}>
-                    <TrashIcon size={14} />
-                  </Button>
-                )}
-              </div>
-            ))}
-            <div className="flex gap-2">
-              <Button onClick={() => addEntry(gi)}>
-                {t.addPersonForm}
-              </Button>
-              {usedPersons.length > 0 && getMissingPersonCount(gi) > 0 && (
-                <Button onClick={() => fillPersons(gi)}>
-                  {t.fillPersons}
-                </Button>
-              )}
-            </div>
-          </div>
-        ))}
+        <VerbFormEditor
+          formTypeGroups={formTypeGroups}
+          usedFormTypes={usedFormTypes}
+          usedPersons={usedPersons}
+          showFormTypeSuggestions={showFormTypeSuggestions}
+          onShowFormTypeSuggestions={setShowFormTypeSuggestions}
+          onUpdateFormType={updateFormType}
+          onUpdateEntry={updateEntry}
+          onAddEntry={addEntry}
+          onRemoveEntry={removeEntry}
+          onRemoveFormTypeGroup={removeFormTypeGroup}
+          onFillPersons={fillPersons}
+          getMissingPersonCount={getMissingPersonCount}
+          formTypeRef={(gi, el) => { formTypeRefs.current[gi] = el; }}
+          personRef={(gi, ei, el) => { personRefs.current[`${gi}-${ei}`] = el; }}
+          formRef={(gi, ei, el) => { formRefs.current[`${gi}-${ei}`] = el; }}
+          onFormTypeKeyDown={(gi, e) => { if (e.key === 'Enter') personRefs.current[`${gi}-0`]?.focus(); }}
+          onPersonKeyDown={(gi, ei, e) => { if (e.key === 'Enter') formRefs.current[`${gi}-${ei}`]?.focus(); }}
+          onPersonPaste={handleEntryPaste}
+        />
       </div>
 
       <div className="flex items-center justify-between mt-3">
-        <Button onClick={addFormTypeGroup}>
-          {t.addFormType}
-        </Button>
+        <Button onClick={addFormTypeGroup}>{t.addFormType}</Button>
         <Button onClick={handleAdd}>{t.add}</Button>
       </div>
 

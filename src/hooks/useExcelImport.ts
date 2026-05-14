@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { isTauriRuntime } from '../utils/tauri';
 
 export interface ParsedPair {
   source: string;
@@ -34,9 +35,6 @@ interface HeaderGuard {
   source: string;
   target: string;
 }
-
-const isTauriRuntime = () =>
-  typeof window !== 'undefined' && typeof (window as any).__TAURI_INTERNALS__ !== 'undefined';
 
 async function tauriInvoke<T>(command: string, args: Record<string, unknown>): Promise<T> {
   const mod = await import('@tauri-apps/api/core');
