@@ -25,13 +25,13 @@ export function VerbRow({ verb, onEdit, showSection, sectionName, isSelected = f
 
   const isDisabled = Boolean(verb.disabled);
 
-  const tenseGroups = verb.conjugations.reduce<Record<string, { person: string; form: string }[]>>((acc, c) => {
-    if (!acc[c.tense]) acc[c.tense] = [];
-    acc[c.tense].push({ person: c.person, form: c.form });
+  const formTypeGroups = verb.conjugations.reduce<Record<string, { person: string; form: string }[]>>((acc, c) => {
+    if (!acc[c.form_type]) acc[c.form_type] = [];
+    acc[c.form_type].push({ person: c.person, form: c.form });
     return acc;
   }, {});
 
-  const tenseNames = Object.keys(tenseGroups);
+  const formTypeNames = Object.keys(formTypeGroups);
 
   const isPartOfDrag = draggingVerbIds.length > 0 && (draggingVerbIds.includes(verb.id) || isSelected);
 
@@ -80,16 +80,26 @@ export function VerbRow({ verb, onEdit, showSection, sectionName, isSelected = f
         <span className="text-gray-400">
           {expanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
         </span>
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 flex flex-wrap items-baseline gap-x-1">
           <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
             {verb.infinitive_source}
           </span>
-          <span className="text-gray-400 dark:text-gray-500 mx-2">&rarr;</span>
+          <span className="text-gray-400 dark:text-gray-500">&rarr;</span>
           <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
             {verb.infinitive_target}
           </span>
-          <span className="text-xs text-gray-400 dark:text-gray-500 ml-3">
-            {tenseNames.length} {tenseNames.length === 1 ? t.tense : t.tenses} &middot; {verb.conjugations.length} {t.forms}
+          {verb.auxiliary && (
+            <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded ml-1">
+              {verb.auxiliary}
+            </span>
+          )}
+          {verb.case_preposition && (
+            <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
+              {verb.case_preposition}
+            </span>
+          )}
+          <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">
+            {formTypeNames.length} {formTypeNames.length === 1 ? t.formType : t.formTypes} &middot; {verb.conjugations.length} {t.forms}
           </span>
         </div>
         {showSection && (
@@ -118,14 +128,14 @@ export function VerbRow({ verb, onEdit, showSection, sectionName, isSelected = f
       {/* Expanded conjugation details */}
       {expanded && (
         <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3">
-          {tenseNames.map((tense) => (
-            <div key={tense} className="mb-3 last:mb-0">
+          {formTypeNames.map((formType) => (
+            <div key={formType} className="mb-3 last:mb-0">
               <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wide mb-1.5">
-                {tense}
+                {formType}
               </p>
               <div className="overflow-x-auto">
                 <div className="flex gap-4 text-sm min-w-0">
-                  {tenseGroups[tense].map((entry, i) => (
+                  {formTypeGroups[formType].map((entry, i) => (
                     <div key={i} className="flex flex-col items-start min-w-[70px]">
                       <span className="text-gray-500 dark:text-gray-400 text-xs">{entry.person}</span>
                       <span className="text-gray-800 dark:text-gray-200 font-medium">{entry.form}</span>

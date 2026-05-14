@@ -40,13 +40,15 @@ export interface Verb {
   infinitive_source: string;
   infinitive_target: string;
   disabled?: boolean;
+  auxiliary?: string | null;
+  case_preposition?: string | null;
   created_at?: string;
 }
 
 export interface Conjugation {
   id: number;
   verb_id: number;
-  tense: string;
+  form_type: string;
   person: string;
   form: string;
   created_at?: string;

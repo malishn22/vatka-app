@@ -9,7 +9,7 @@ export interface ParsedPair {
 }
 
 export interface ParsedConjugation {
-  tense: string;
+  form_type: string;
   person: string;
   form: string;
 }
@@ -17,6 +17,8 @@ export interface ParsedConjugation {
 export interface ParsedVerb {
   infinitive_source: string;
   infinitive_target: string;
+  auxiliary?: string;
+  case_preposition?: string;
   section?: string;
   subsection?: string;
   disabled?: boolean;
@@ -170,23 +172,18 @@ function buildPairsFromRows(rows: string[][], headerGuard?: HeaderGuard): Parsed
 function isVerbCsvHeaders(rows: string[][]): boolean {
   if (rows.length === 0) return false;
   const first = rows[0].map(c => (c ?? '').trim().toLowerCase());
-  return first.includes('tense') || first.includes('conjugations');
+  return first.includes('form type');
 }
 
 function buildVerbsFromRows(rows: string[][], headerGuard?: HeaderGuard): ParsedVerb[] {
   if (rows.length === 0) return [];
 
-  // Detect old JSON format vs new tense-row format
-  const headerRow = rows[0].map(c => (c ?? '').trim().toLowerCase());
-  const isOldJsonFormat = headerRow.includes('conjugations') && !headerRow.includes('tense');
-
-  if (isOldJsonFormat) {
-    return buildVerbsFromRowsJsonLegacy(rows, headerGuard);
-  }
-
-  // New tense-row format: find "section" column position to know where person/form pairs end
-  const sectionColIdx = headerRow.indexOf('section');
-  const secIdx = sectionColIdx >= 0 ? sectionColIdx : undefined;
+  // Fixed 14-column format:
+  // 0: Source Infinitive, 1: Target Infinitive, 2: Section, 3: Subsection,
+  // 4: Form Type, 5-10: Person/Form 1-6, 11: Auxiliary, 12: Case/Preposition, 13: Hidden
+  const FORM_TYPE_COL = 4;
+  const PAIRS_START = 5;
+  const PAIRS_END = 11;
 
   // Filter data rows (skip header + empty + guard)
   const dataRows = rows.filter(row => {
@@ -208,35 +205,31 @@ function buildVerbsFromRows(rows: string[][], headerGuard?: HeaderGuard): Parsed
   while (i < dataRows.length) {
     const keySrc = String(dataRows[i][0] ?? '').trim();
     const keyTgt = String(dataRows[i][1] ?? '').trim();
+    const section        = String(dataRows[i][2]  ?? '').trim();
+    const subsection     = String(dataRows[i][3]  ?? '').trim();
+    const auxiliary      = String(dataRows[i][11] ?? '').trim();
+    const casePreposition = String(dataRows[i][12] ?? '').trim();
+    const hidden         = String(dataRows[i][13] ?? '').trim();
     const conjugations: ParsedConjugation[] = [];
-
-    // Determine trailing column positions
-    const rowLen = dataRows[i].length;
-    const sectionCol = secIdx ?? Math.max(3, rowLen - 3);
-
-    const section = String(dataRows[i][sectionCol] ?? '').trim();
-    const subsection = String(dataRows[i][sectionCol + 1] ?? '').trim();
-    const hidden = String(dataRows[i][sectionCol + 2] ?? '').trim();
 
     while (i < dataRows.length) {
       const src = String(dataRows[i][0] ?? '').trim();
       const tgt = String(dataRows[i][1] ?? '').trim();
       if (src !== keySrc || tgt !== keyTgt) break;
 
-      const tense = String(dataRows[i][2] ?? '').trim();
-      // Read conjugation cells from col 3 to sectionCol (each cell is "person - form")
-      let j = 3;
-      while (j < sectionCol) {
+      const formType = String(dataRows[i][FORM_TYPE_COL] ?? '').trim();
+      for (let j = PAIRS_START; j < PAIRS_END; j++) {
         const cell = String(dataRows[i][j] ?? '').trim();
-        const dashIdx = cell.indexOf(' - ');
-        if (dashIdx >= 0) {
-          const person = cell.substring(0, dashIdx);
-          const form = cell.substring(dashIdx + 3);
-          if (person && form) {
-            conjugations.push({ tense, person, form });
+        if (cell) {
+          const dashIdx = cell.indexOf(' - ');
+          if (dashIdx >= 0) {
+            const person = cell.substring(0, dashIdx);
+            const form = cell.substring(dashIdx + 3);
+            if (person && form) {
+              conjugations.push({ form_type: formType, person, form });
+            }
           }
         }
-        j++;
       }
       i++;
     }
@@ -245,6 +238,8 @@ function buildVerbsFromRows(rows: string[][], headerGuard?: HeaderGuard): Parsed
       infinitive_source: keySrc,
       infinitive_target: keyTgt,
       conjugations,
+      ...(auxiliary ? { auxiliary } : {}),
+      ...(casePreposition ? { case_preposition: casePreposition } : {}),
       ...(section ? { section } : {}),
       ...(subsection ? { subsection } : {}),
       ...(hidden.toLowerCase() === 'hidden' ? { disabled: true } : {}),
@@ -252,45 +247,6 @@ function buildVerbsFromRows(rows: string[][], headerGuard?: HeaderGuard): Parsed
   }
 
   return verbs;
-}
-
-/** Backward-compatible parser for old JSON conjugation CSV format */
-function buildVerbsFromRowsJsonLegacy(rows: string[][], headerGuard?: HeaderGuard): ParsedVerb[] {
-  const dataRows = rows.filter(row => {
-    const src = String(row[0] ?? '').trim();
-    const tgt = String(row[1] ?? '').trim();
-    if (!src && !tgt) return false;
-    if (src.toLowerCase() === 'source infinitive') return false;
-    if (
-      headerGuard &&
-      src.toLowerCase() === headerGuard.source.toLowerCase() &&
-      tgt.toLowerCase() === headerGuard.target.toLowerCase()
-    ) return false;
-    return true;
-  });
-
-  return dataRows.map(row => {
-    const inf_src = String(row[0] ?? '').trim();
-    const inf_tgt = String(row[1] ?? '').trim();
-    const conjJson = String(row[2] ?? '').trim();
-    const section = String(row[3] ?? '').trim();
-    const subsection = String(row[4] ?? '').trim();
-    const hidden = String(row[5] ?? '').trim();
-
-    let conjugations: ParsedConjugation[] = [];
-    try {
-      conjugations = JSON.parse(conjJson || '[]');
-    } catch { /* ignore */ }
-
-    return {
-      infinitive_source: inf_src,
-      infinitive_target: inf_tgt,
-      conjugations,
-      ...(section ? { section } : {}),
-      ...(subsection ? { subsection } : {}),
-      ...(hidden.toLowerCase() === 'hidden' ? { disabled: true } : {}),
-    };
-  });
 }
 
 /**

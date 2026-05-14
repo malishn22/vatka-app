@@ -11,8 +11,8 @@ interface ConjugationEntry {
   form: string;
 }
 
-interface TenseGroup {
-  tense: string;
+interface FormTypeGroup {
+  formType: string;
   entries: ConjugationEntry[];
 }
 
@@ -26,28 +26,30 @@ interface AddVerbFormProps {
 }
 
 export function AddVerbForm({ levelId, sectionId, languageId, sourceLabel, targetLabel, onAdded }: AddVerbFormProps) {
-  const { addVerb, levels, verbExistsInLanguage, fetchUsedTenses, fetchUsedPersons } = useDataStore();
+  const { addVerb, levels, verbExistsInLanguage, fetchUsedFormTypes, fetchUsedPersons } = useDataStore();
   const t = useT();
   const [infinitiveSource, setInfinitiveSource] = useState('');
   const [infinitiveTarget, setInfinitiveTarget] = useState('');
-  const [tenseGroups, setTenseGroups] = useState<TenseGroup[]>([
-    { tense: '', entries: [{ person: '', form: '' }] },
+  const [auxiliary, setAuxiliary] = useState('');
+  const [casePreposition, setCasePreposition] = useState('');
+  const [formTypeGroups, setFormTypeGroups] = useState<FormTypeGroup[]>([
+    { formType: '', entries: [{ person: '', form: '' }] },
   ]);
   const [error, setError] = useState('');
-  const [usedTenses, setUsedTenses] = useState<string[]>([]);
+  const [usedFormTypes, setUsedFormTypes] = useState<string[]>([]);
   const [usedPersons, setUsedPersons] = useState<string[]>([]);
-  const [showTenseSuggestions, setShowTenseSuggestions] = useState<number | null>(null);
+  const [showFormTypeSuggestions, setShowFormTypeSuggestions] = useState<number | null>(null);
 
   // Refs for focus management
   const sourceRef = useRef<HTMLInputElement>(null);
   const targetRef = useRef<HTMLInputElement>(null);
-  const tenseRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const formTypeRefs = useRef<Record<number, HTMLInputElement | null>>({});
   const personRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const formRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const pendingFocusRef = useRef<{ type: 'person' | 'form'; key: string } | null>(null);
 
   useEffect(() => {
-    fetchUsedTenses(languageId).then(setUsedTenses);
+    fetchUsedFormTypes(languageId).then(setUsedFormTypes);
     fetchUsedPersons(languageId).then(setUsedPersons);
   }, [languageId]);
 
@@ -64,7 +66,7 @@ export function AddVerbForm({ levelId, sectionId, languageId, sourceLabel, targe
         }
       }, 0);
     }
-  }, [tenseGroups]);
+  }, [formTypeGroups]);
 
   // Paired paste for infinitive inputs
   const handleInfinitivePaste = usePairedPaste((left, right) => {
@@ -73,12 +75,12 @@ export function AddVerbForm({ levelId, sectionId, languageId, sourceLabel, targe
     setError('');
   }, targetRef);
 
-  const updateTense = (groupIdx: number, tense: string) => {
-    setTenseGroups((prev) => prev.map((g, i) => i === groupIdx ? { ...g, tense } : g));
+  const updateFormType = (groupIdx: number, formType: string) => {
+    setFormTypeGroups((prev) => prev.map((g, i) => i === groupIdx ? { ...g, formType } : g));
   };
 
   const updateEntry = (groupIdx: number, entryIdx: number, field: 'person' | 'form', value: string) => {
-    setTenseGroups((prev) => prev.map((g, gi) =>
+    setFormTypeGroups((prev) => prev.map((g, gi) =>
       gi === groupIdx
         ? { ...g, entries: g.entries.map((e, ei) => ei === entryIdx ? { ...e, [field]: value } : e) }
         : g
@@ -86,55 +88,52 @@ export function AddVerbForm({ levelId, sectionId, languageId, sourceLabel, targe
   };
 
   const addEntry = (groupIdx: number) => {
-    const newEntryIdx = tenseGroups[groupIdx].entries.length;
+    const newEntryIdx = formTypeGroups[groupIdx].entries.length;
     pendingFocusRef.current = { type: 'person', key: `${groupIdx}-${newEntryIdx}` };
-    setTenseGroups((prev) => prev.map((g, i) =>
+    setFormTypeGroups((prev) => prev.map((g, i) =>
       i === groupIdx ? { ...g, entries: [...g.entries, { person: '', form: '' }] } : g
     ));
   };
 
   const removeEntry = (groupIdx: number, entryIdx: number) => {
-    setTenseGroups((prev) => prev.map((g, gi) =>
+    setFormTypeGroups((prev) => prev.map((g, gi) =>
       gi === groupIdx
         ? { ...g, entries: g.entries.filter((_, ei) => ei !== entryIdx) }
         : g
     ));
   };
 
-  const addTenseGroup = () => {
-    setTenseGroups((prev) => [...prev, { tense: '', entries: [{ person: '', form: '' }] }]);
+  const addFormTypeGroup = () => {
+    setFormTypeGroups((prev) => [...prev, { formType: '', entries: [{ person: '', form: '' }] }]);
   };
 
-  const removeTenseGroup = (groupIdx: number) => {
-    setTenseGroups((prev) => prev.filter((_, i) => i !== groupIdx));
+  const removeFormTypeGroup = (groupIdx: number) => {
+    setFormTypeGroups((prev) => prev.filter((_, i) => i !== groupIdx));
   };
 
   const fillPersons = (groupIdx: number) => {
-    const group = tenseGroups[groupIdx];
+    const group = formTypeGroups[groupIdx];
     const existingPersons = new Set(group.entries.map((e) => e.person.trim().toLowerCase()).filter(Boolean));
     const missingPersons = usedPersons.filter((p) => !existingPersons.has(p.toLowerCase()));
     if (missingPersons.length === 0) return;
 
-    // Remove empty rows (no person and no form), then add missing persons
     const nonEmptyEntries = group.entries.filter((e) => e.person.trim() || e.form.trim());
     const newEntries = [
       ...nonEmptyEntries,
       ...missingPersons.map((p) => ({ person: p, form: '' })),
     ];
-    // If all rows were empty, just use the new persons
     const finalEntries = newEntries.length > 0 ? newEntries : missingPersons.map((p) => ({ person: p, form: '' }));
 
-    // Focus the first empty form field after filling
     const firstEmptyFormIdx = finalEntries.findIndex((e) => !e.form.trim());
     if (firstEmptyFormIdx >= 0) {
       pendingFocusRef.current = { type: 'form', key: `${groupIdx}-${firstEmptyFormIdx}` };
     }
 
-    setTenseGroups((prev) => prev.map((g, i) => i === groupIdx ? { ...g, entries: finalEntries } : g));
+    setFormTypeGroups((prev) => prev.map((g, i) => i === groupIdx ? { ...g, entries: finalEntries } : g));
   };
 
   const getMissingPersonCount = (groupIdx: number) => {
-    const group = tenseGroups[groupIdx];
+    const group = formTypeGroups[groupIdx];
     const existingPersons = new Set(group.entries.map((e) => e.person.trim().toLowerCase()).filter(Boolean));
     return usedPersons.filter((p) => !existingPersons.has(p.toLowerCase())).length;
   };
@@ -145,10 +144,10 @@ export function AddVerbForm({ levelId, sectionId, languageId, sourceLabel, targe
       return;
     }
 
-    const validConjugations = tenseGroups.flatMap((g) =>
+    const validConjugations = formTypeGroups.flatMap((g) =>
       g.entries
-        .filter((e) => e.person.trim() && e.form.trim() && g.tense.trim())
-        .map((e) => ({ tense: g.tense.trim(), person: e.person.trim(), form: e.form.trim() }))
+        .filter((e) => e.person.trim() && e.form.trim() && g.formType.trim())
+        .map((e) => ({ form_type: g.formType.trim(), person: e.person.trim(), form: e.form.trim() }))
     );
 
     if (validConjugations.length === 0) {
@@ -164,7 +163,14 @@ export function AddVerbForm({ levelId, sectionId, languageId, sourceLabel, targe
 
     try {
       await addVerb(
-        { level_id: levelId, section_id: sectionId, infinitive_source: infinitiveSource.trim(), infinitive_target: infinitiveTarget.trim() },
+        {
+          level_id: levelId,
+          section_id: sectionId,
+          infinitive_source: infinitiveSource.trim(),
+          infinitive_target: infinitiveTarget.trim(),
+          auxiliary: auxiliary.trim() || null,
+          case_preposition: casePreposition.trim() || null,
+        },
         validConjugations
       );
     } catch (e) {
@@ -174,14 +180,16 @@ export function AddVerbForm({ levelId, sectionId, languageId, sourceLabel, targe
 
     setInfinitiveSource('');
     setInfinitiveTarget('');
-    setTenseGroups([{ tense: '', entries: [{ person: '', form: '' }] }]);
+    setAuxiliary('');
+    setCasePreposition('');
+    setFormTypeGroups([{ formType: '', entries: [{ person: '', form: '' }] }]);
     setError('');
     sourceRef.current?.focus();
     onAdded?.();
   };
 
-  const filteredTenses = (query: string) =>
-    usedTenses.filter((t) => t.toLowerCase().includes(query.toLowerCase()) && t.toLowerCase() !== query.toLowerCase());
+  const filteredFormTypes = (query: string) =>
+    usedFormTypes.filter((ft) => ft.toLowerCase().includes(query.toLowerCase()) && ft.toLowerCase() !== query.toLowerCase());
 
   // Paired paste handler for person/form rows
   const handleEntryPaste = (gi: number, ei: number, e: React.ClipboardEvent<HTMLInputElement>) => {
@@ -234,41 +242,61 @@ export function AddVerbForm({ levelId, sectionId, languageId, sourceLabel, targe
             placeholder={t.wordIn(targetLabel)}
             value={infinitiveTarget}
             onChange={(e) => setInfinitiveTarget(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') tenseRefs.current[0]?.focus(); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') formTypeRefs.current[0]?.focus(); }}
             onPaste={handleInfinitivePaste}
           />
         </div>
       </div>
 
-      {/* Tense groups */}
+      {/* Auxiliary + Case/Preposition */}
+      <div className="flex gap-3 mb-4">
+        <div className="flex-1">
+          <Input
+            label="Auxiliary"
+            placeholder="e.g. Haben"
+            value={auxiliary}
+            onChange={(e) => setAuxiliary(e.target.value)}
+          />
+        </div>
+        <div className="flex-1">
+          <Input
+            label="Case/Preposition"
+            placeholder="e.g. Akk."
+            value={casePreposition}
+            onChange={(e) => setCasePreposition(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Form type groups */}
       <div className="max-h-[40vh] overflow-y-auto">
-        {tenseGroups.map((group, gi) => (
+        {formTypeGroups.map((group, gi) => (
           <div key={gi} className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
             <div className="flex items-center gap-2 mb-2">
               <div className="flex-1 relative">
                 <Input
-                  ref={(el) => { tenseRefs.current[gi] = el; }}
+                  ref={(el) => { formTypeRefs.current[gi] = el; }}
                   inputSize="sm"
-                  placeholder={t.tenseName}
-                  value={group.tense}
-                  onChange={(e) => { updateTense(gi, e.target.value); setShowTenseSuggestions(gi); }}
-                  onFocus={() => setShowTenseSuggestions(gi)}
-                  onBlur={() => setTimeout(() => setShowTenseSuggestions(null), 150)}
+                  placeholder={t.formTypeName}
+                  value={group.formType}
+                  onChange={(e) => { updateFormType(gi, e.target.value); setShowFormTypeSuggestions(gi); }}
+                  onFocus={() => setShowFormTypeSuggestions(gi)}
+                  onBlur={() => setTimeout(() => setShowFormTypeSuggestions(null), 150)}
                   onKeyDown={(e) => { if (e.key === 'Enter') personRefs.current[`${gi}-0`]?.focus(); }}
                 />
-                {showTenseSuggestions === gi && group.tense && filteredTenses(group.tense).length > 0 && (
+                {showFormTypeSuggestions === gi && group.formType && filteredFormTypes(group.formType).length > 0 && (
                   <div className="absolute z-10 top-full mt-1 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded shadow-lg max-h-32 overflow-y-auto">
-                    {filteredTenses(group.tense).map((t) => (
-                      <button key={t} className="w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200"
-                        onMouseDown={() => { updateTense(gi, t); setShowTenseSuggestions(null); }}>
-                        {t}
+                    {filteredFormTypes(group.formType).map((ft) => (
+                      <button key={ft} className="w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200"
+                        onMouseDown={() => { updateFormType(gi, ft); setShowFormTypeSuggestions(null); }}>
+                        {ft}
                       </button>
                     ))}
                   </div>
                 )}
               </div>
-              {tenseGroups.length > 1 && (
-                <Button variant="icon" hoverColor="red" onClick={() => removeTenseGroup(gi)} title={t.delete}>
+              {formTypeGroups.length > 1 && (
+                <Button variant="icon" hoverColor="red" onClick={() => removeFormTypeGroup(gi)} title={t.delete}>
                   <TrashIcon size={16} />
                 </Button>
               )}
@@ -325,8 +353,8 @@ export function AddVerbForm({ levelId, sectionId, languageId, sourceLabel, targe
       </div>
 
       <div className="flex items-center justify-between mt-3">
-        <Button onClick={addTenseGroup}>
-          {t.addTense}
+        <Button onClick={addFormTypeGroup}>
+          {t.addFormType}
         </Button>
         <Button onClick={handleAdd}>{t.add}</Button>
       </div>

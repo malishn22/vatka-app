@@ -47,7 +47,7 @@ interface DataState {
   toggleVerbDisabled: (id: number) => Promise<void>;
   verbExistsInLanguage: (languageId: number, infinitiveSource: string, infinitiveTarget: string) => Promise<boolean>;
   moveVerb: (id: number, levelId: number, sectionId: number | null) => Promise<void>;
-  fetchUsedTenses: (languageId: number) => Promise<string[]>;
+  fetchUsedFormTypes: (languageId: number) => Promise<string[]>;
   fetchUsedPersons: (languageId: number) => Promise<string[]>;
 }
 
@@ -320,14 +320,14 @@ export const useDataStore = create<DataState>((set, get) => ({
   addVerb: async (verb, conjugations) => {
     try {
       const result = await dbExecute(
-        'INSERT INTO verbs (level_id, section_id, infinitive_source, infinitive_target, disabled) VALUES (?, ?, ?, ?, ?)',
-        [verb.level_id, verb.section_id ?? null, verb.infinitive_source, verb.infinitive_target, verb.disabled ? 1 : 0]
+        'INSERT INTO verbs (level_id, section_id, infinitive_source, infinitive_target, disabled, auxiliary, case_preposition) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [verb.level_id, verb.section_id ?? null, verb.infinitive_source, verb.infinitive_target, verb.disabled ? 1 : 0, verb.auxiliary ?? null, verb.case_preposition ?? null]
       );
       const verbId = result.lastInsertId!;
       for (const c of conjugations) {
         await dbExecute(
-          'INSERT INTO conjugations (verb_id, tense, person, form) VALUES (?, ?, ?, ?)',
-          [verbId, c.tense, c.person, c.form]
+          'INSERT INTO conjugations (verb_id, form_type, person, form) VALUES (?, ?, ?, ?)',
+          [verbId, c.form_type, c.person, c.form]
         );
       }
     } finally {
@@ -340,21 +340,23 @@ export const useDataStore = create<DataState>((set, get) => ({
     if (!existing) return;
     const levelId = verb.level_id ?? existing.level_id;
     await dbExecute(
-      'UPDATE verbs SET infinitive_source = ?, infinitive_target = ?, disabled = ?, level_id = ?, section_id = ? WHERE id = ?',
+      'UPDATE verbs SET infinitive_source = ?, infinitive_target = ?, disabled = ?, level_id = ?, section_id = ?, auxiliary = ?, case_preposition = ? WHERE id = ?',
       [
         verb.infinitive_source ?? existing.infinitive_source,
         verb.infinitive_target ?? existing.infinitive_target,
         verb.disabled !== undefined ? (verb.disabled ? 1 : 0) : (existing.disabled ? 1 : 0),
         levelId,
         'section_id' in verb ? verb.section_id : existing.section_id,
+        'auxiliary' in verb ? (verb.auxiliary ?? null) : (existing.auxiliary ?? null),
+        'case_preposition' in verb ? (verb.case_preposition ?? null) : (existing.case_preposition ?? null),
         id,
       ]
     );
     await dbExecute('DELETE FROM conjugations WHERE verb_id = ?', [id]);
     for (const c of conjugations) {
       await dbExecute(
-        'INSERT INTO conjugations (verb_id, tense, person, form) VALUES (?, ?, ?, ?)',
-        [id, c.tense, c.person, c.form]
+        'INSERT INTO conjugations (verb_id, form_type, person, form) VALUES (?, ?, ?, ?)',
+        [id, c.form_type, c.person, c.form]
       );
     }
     await get().fetchVerbs(levelId);
@@ -405,16 +407,16 @@ export const useDataStore = create<DataState>((set, get) => ({
     await get().fetchVerbs(sourceLevelId);
   },
 
-  fetchUsedTenses: async (languageId) => {
-    const rows = await dbSelect<{ tense: string }>(
-      `SELECT DISTINCT c.tense FROM conjugations c
+  fetchUsedFormTypes: async (languageId) => {
+    const rows = await dbSelect<{ form_type: string }>(
+      `SELECT DISTINCT c.form_type FROM conjugations c
        JOIN verbs v ON c.verb_id = v.id
        JOIN levels l ON v.level_id = l.id
        WHERE l.language_id = ?
-       ORDER BY c.tense`,
+       ORDER BY c.form_type`,
       [languageId]
     );
-    return rows.map((r) => r.tense);
+    return rows.map((r) => r.form_type);
   },
 
   fetchUsedPersons: async (languageId) => {

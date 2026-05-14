@@ -47,7 +47,7 @@ pub struct ExportLevel {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportConjugation {
-  pub tense: String,
+  pub form_type: String,
   pub person: String,
   pub form: String,
 }
@@ -59,12 +59,14 @@ pub struct ExportVerb {
   pub level_id: i64,
   pub section_id: Option<i64>,
   pub disabled: bool,
+  pub auxiliary: Option<String>,
+  pub case_preposition: Option<String>,
   pub conjugations: Vec<ExportConjugation>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParsedConjugation {
-  pub tense: String,
+  pub form_type: String,
   pub person: String,
   pub form: String,
 }
@@ -73,6 +75,10 @@ pub struct ParsedConjugation {
 pub struct ParsedVerb {
   pub infinitive_source: String,
   pub infinitive_target: String,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub auxiliary: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub case_preposition: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub section: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
@@ -252,123 +258,90 @@ fn read_csv(bytes: Vec<u8>) -> Result<Vec<Vec<String>>, String> {
 fn is_verb_sheet(rows: &[Vec<String>]) -> bool {
   for row in rows.iter().take(3) {
     let lower: Vec<String> = row.iter().map(|c| c.trim().to_lowercase()).collect();
-    // New format: "tense" header; old format: "conjugations" header (backward compat)
-    if lower.contains(&"tense".to_string()) || lower.contains(&"conjugations".to_string()) {
+    if lower.contains(&"form type".to_string()) {
       return true;
-    }
-  }
-  false
-}
-
-fn is_old_json_verb_format(rows: &[Vec<String>]) -> bool {
-  // Old format had "Conjugations" as header in col 2; new format has "Tense"
-  for row in rows.iter().take(3) {
-    let col2 = row.get(2).map(|s| s.trim().to_lowercase()).unwrap_or_default();
-    if col2 == "conjugations" {
-      return true;
-    }
-    if col2 == "tense" {
-      return false;
     }
   }
   false
 }
 
 fn parse_verb_rows(rows: Vec<Vec<String>>, header_guard: &Option<HeaderGuard>) -> Vec<ParsedVerb> {
-  if is_old_json_verb_format(&rows) {
-    return parse_verb_rows_json_legacy(rows, header_guard);
-  }
+  // Fixed 14-column format:
+  // 0: Source Infinitive, 1: Target Infinitive, 2: Section, 3: Subsection,
+  // 4: Form Type, 5-10: Person/Form 1-6, 11: Auxiliary, 12: Case/Preposition, 13: Hidden
+  const FORM_TYPE_COL: usize = 4;
+  const PAIRS_START: usize = 5;
+  const PAIRS_END: usize = 11;
+  const SEC_COL: usize = 2;
+  const SUB_COL: usize = 3;
+  const AUX_COL: usize = 11;
+  const CASE_PREP_COL: usize = 12;
+  const HIDDEN_COL: usize = 13;
 
-  // New flat tense-row format:
-  // Col 0: Source Infinitive, Col 1: Target Infinitive, Col 2: Tense
-  // Cols 3..end-3: Person/Form pairs
-  // Last 3 cols: Section, Subsection, Hidden
-
-  // Find the trailing column positions by detecting the header row
-  let mut section_col_offset: Option<usize> = None;
-  for row in rows.iter().take(3) {
-    for (i, cell) in row.iter().enumerate() {
-      if cell.trim().eq_ignore_ascii_case("section") {
-        section_col_offset = Some(i);
-        break;
-      }
-    }
-    if section_col_offset.is_some() { break; }
-  }
-
-  // Collect data rows (skip headers and empty rows)
-  struct TenseRow {
+  struct FormTypeRow {
     inf_src: String,
     inf_tgt: String,
-    tense: String,
+    auxiliary: String,
+    case_preposition: String,
+    form_type: String,
     pairs: Vec<(String, String)>,
     section: String,
     subsection: String,
     hidden: String,
   }
 
-  let mut tense_rows: Vec<TenseRow> = Vec::new();
+  let mut form_type_rows: Vec<FormTypeRow> = Vec::new();
 
   for row in &rows {
     let inf_src = row.get(0).map(|s| s.trim()).unwrap_or("").to_string();
     let inf_tgt = row.get(1).map(|s| s.trim()).unwrap_or("").to_string();
 
-    // Skip header rows
-    if inf_src.eq_ignore_ascii_case("source infinitive") {
-      continue;
-    }
+    if inf_src.eq_ignore_ascii_case("source infinitive") { continue; }
     if let Some(ref guard) = header_guard {
-      if eq_guard(&inf_src, &inf_tgt, guard) {
-        continue;
-      }
+      if eq_guard(&inf_src, &inf_tgt, guard) { continue; }
     }
-    if inf_src.is_empty() && inf_tgt.is_empty() {
-      continue;
-    }
+    if inf_src.is_empty() && inf_tgt.is_empty() { continue; }
 
-    let tense = row.get(2).map(|s| s.trim()).unwrap_or("").to_string();
+    let form_type    = row.get(FORM_TYPE_COL).map(|s| s.trim()).unwrap_or("").to_string();
+    let section      = row.get(SEC_COL).map(|s| s.trim()).unwrap_or("").to_string();
+    let subsection   = row.get(SUB_COL).map(|s| s.trim()).unwrap_or("").to_string();
+    let auxiliary    = row.get(AUX_COL).map(|s| s.trim()).unwrap_or("").to_string();
+    let case_preposition = row.get(CASE_PREP_COL).map(|s| s.trim()).unwrap_or("").to_string();
+    let hidden       = row.get(HIDDEN_COL).map(|s| s.trim()).unwrap_or("").to_string();
 
-    // Determine where section/subsection/hidden are (last 3 meaningful cols)
-    let sec_idx = section_col_offset.unwrap_or_else(|| if row.len() >= 3 { row.len().saturating_sub(3) } else { 3 });
-
-    // Read conjugation cells from col 3 to sec_idx (each cell is "person - form")
     let mut pairs: Vec<(String, String)> = Vec::new();
-    let mut i = 3;
-    while i < sec_idx && i < row.len() {
+    let mut i = PAIRS_START;
+    while i < PAIRS_END && i < row.len() {
       let cell = row.get(i).map(|s| s.trim()).unwrap_or("");
-      if let Some((person, form)) = cell.split_once(" - ") {
-        pairs.push((person.trim().to_string(), form.trim().to_string()));
+      if !cell.is_empty() {
+        if let Some((person, form)) = cell.split_once(" - ") {
+          pairs.push((person.trim().to_string(), form.trim().to_string()));
+        }
       }
       i += 1;
     }
 
-    let section = row.get(sec_idx).map(|s| s.trim()).unwrap_or("").to_string();
-    let subsection = row.get(sec_idx + 1).map(|s| s.trim()).unwrap_or("").to_string();
-    let hidden = row.get(sec_idx + 2).map(|s| s.trim()).unwrap_or("").to_string();
-
-    tense_rows.push(TenseRow { inf_src, inf_tgt, tense, pairs, section, subsection, hidden });
+    form_type_rows.push(FormTypeRow { inf_src, inf_tgt, auxiliary, case_preposition, form_type, pairs, section, subsection, hidden });
   }
 
-  // Group tense rows by (inf_src, inf_tgt) to reconstruct verbs
+  // Group by (inf_src, inf_tgt)
   let mut verbs: Vec<ParsedVerb> = Vec::new();
-
   let mut i = 0;
-  while i < tense_rows.len() {
-    let key_src = &tense_rows[i].inf_src;
-    let key_tgt = &tense_rows[i].inf_tgt;
-
-    let section = tense_rows[i].section.clone();
-    let subsection = tense_rows[i].subsection.clone();
-    let hidden = tense_rows[i].hidden.clone();
+  while i < form_type_rows.len() {
+    let key_src = form_type_rows[i].inf_src.clone();
+    let key_tgt = form_type_rows[i].inf_tgt.clone();
+    let auxiliary        = form_type_rows[i].auxiliary.clone();
+    let case_preposition = form_type_rows[i].case_preposition.clone();
+    let section          = form_type_rows[i].section.clone();
+    let subsection       = form_type_rows[i].subsection.clone();
+    let hidden           = form_type_rows[i].hidden.clone();
 
     let mut conjugations: Vec<ParsedConjugation> = Vec::new();
-
-    // Collect all consecutive rows with the same infinitive pair
-    while i < tense_rows.len() && tense_rows[i].inf_src == *key_src && tense_rows[i].inf_tgt == *key_tgt {
-      let tr = &tense_rows[i];
+    while i < form_type_rows.len() && form_type_rows[i].inf_src == key_src && form_type_rows[i].inf_tgt == key_tgt {
+      let tr = &form_type_rows[i];
       for (person, form) in &tr.pairs {
         conjugations.push(ParsedConjugation {
-          tense: tr.tense.clone(),
+          form_type: tr.form_type.clone(),
           person: person.clone(),
           form: form.clone(),
         });
@@ -377,69 +350,15 @@ fn parse_verb_rows(rows: Vec<Vec<String>>, header_guard: &Option<HeaderGuard>) -
     }
 
     let disabled = if hidden.eq_ignore_ascii_case("hidden") { Some(true) } else { None };
-
     verbs.push(ParsedVerb {
-      infinitive_source: key_src.clone(),
-      infinitive_target: key_tgt.clone(),
+      infinitive_source: key_src,
+      infinitive_target: key_tgt,
+      auxiliary: if auxiliary.is_empty() { None } else { Some(auxiliary) },
+      case_preposition: if case_preposition.is_empty() { None } else { Some(case_preposition) },
       section: if section.is_empty() { None } else { Some(section) },
       subsection: if subsection.is_empty() { None } else { Some(subsection) },
       disabled,
       conjugations,
-    });
-  }
-
-  verbs
-}
-
-/// Backward-compatible parser for old JSON conjugation format
-fn parse_verb_rows_json_legacy(rows: Vec<Vec<String>>, header_guard: &Option<HeaderGuard>) -> Vec<ParsedVerb> {
-  let rows: Vec<Vec<String>> = rows
-    .into_iter()
-    .map(|mut r| {
-      if r.len() < 6 {
-        r.resize(6, "".to_string());
-      }
-      r
-    })
-    .collect();
-
-  let mut verbs: Vec<ParsedVerb> = Vec::new();
-  for row in &rows {
-    let inf_src = row[0].trim().to_string();
-    let inf_tgt = row[1].trim().to_string();
-    let conj_json = row[2].trim().to_string();
-    let section = row[3].trim().to_string();
-    let subsection = row[4].trim().to_string();
-    let hidden_str = row[5].trim().to_string();
-
-    if inf_src.eq_ignore_ascii_case("source infinitive") || inf_src.eq_ignore_ascii_case("conjugations") {
-      continue;
-    }
-    if let Some(ref guard) = header_guard {
-      if eq_guard(&inf_src, &inf_tgt, guard) {
-        continue;
-      }
-    }
-    if inf_src.is_empty() && inf_tgt.is_empty() {
-      continue;
-    }
-
-    let disabled = if hidden_str.eq_ignore_ascii_case("hidden") { Some(true) } else { None };
-
-    // Parse JSON conjugations into structured vec
-    let conjugations: Vec<ParsedConjugation> = if conj_json.is_empty() || conj_json == "[]" {
-      Vec::new()
-    } else {
-      serde_json::from_str::<Vec<ParsedConjugation>>(&conj_json).unwrap_or_default()
-    };
-
-    verbs.push(ParsedVerb {
-      infinitive_source: inf_src,
-      infinitive_target: inf_tgt,
-      conjugations,
-      section: if section.is_empty() { None } else { Some(section) },
-      subsection: if subsection.is_empty() { None } else { Some(subsection) },
-      disabled,
     });
   }
 
@@ -573,34 +492,25 @@ pub fn build_xlsx(payload: ExportPayload) -> Result<Vec<u8>, String> {
         }
         used_sheet_names.push(sheet_name.clone());
 
-        // Find max conjugations per tense across all verbs in this level
-        let mut max_conjs: usize = 0;
-        for v in &lvl_verbs {
-          let mut by_tense: BTreeMap<&str, usize> = BTreeMap::new();
-          for c in &v.conjugations {
-            *by_tense.entry(c.tense.as_str()).or_insert(0) += 1;
-          }
-          for count in by_tense.values() {
-            if *count > max_conjs {
-              max_conjs = *count;
-            }
-          }
-        }
-
-        // Build header: each conjugation is a single column ("person - form")
-        let mut header: Vec<String> = vec![
+        // Fixed 14-column verb format:
+        // 0: Source Infinitive, 1: Target Infinitive, 2: Section, 3: Subsection,
+        // 4: Form Type, 5-10: Person/Form 1-6, 11: Auxiliary, 12: Case/Preposition, 13: Hidden
+        let header: Vec<String> = vec![
           "Source Infinitive".to_string(),
           "Target Infinitive".to_string(),
-          "Tense".to_string(),
+          "Section".to_string(),
+          "Subsection".to_string(),
+          "Form Type".to_string(),
+          "Person/Form 1".to_string(),
+          "Person/Form 2".to_string(),
+          "Person/Form 3".to_string(),
+          "Person/Form 4".to_string(),
+          "Person/Form 5".to_string(),
+          "Person/Form 6".to_string(),
+          "Auxiliary".to_string(),
+          "Case/Preposition".to_string(),
+          "Hidden".to_string(),
         ];
-        for i in 1..=max_conjs {
-          header.push(format!("Person/Form {i}"));
-        }
-        header.push("Section".to_string());
-        header.push("Subsection".to_string());
-        header.push("Hidden".to_string());
-
-        let total_cols = header.len();
 
         // Build rows
         let mut rows: Vec<Vec<String>> = Vec::new();
@@ -608,40 +518,44 @@ pub fn build_xlsx(payload: ExportPayload) -> Result<Vec<u8>, String> {
           let sec = level_map.get(&v.level_id).cloned().unwrap_or_default();
           let sub = v.section_id.and_then(|id| section_map.get(&id).cloned()).unwrap_or_default();
           let hidden = if v.disabled { "Hidden".to_string() } else { "Shown".to_string() };
+          let aux = v.auxiliary.clone().unwrap_or_default();
+          let case_prep = v.case_preposition.clone().unwrap_or_default();
 
           if v.conjugations.is_empty() {
-            let mut row = vec![
+            let row = vec![
               v.infinitive_source.clone(),
               v.infinitive_target.clone(),
-              String::new(), // empty tense
+              sec, sub,
+              String::new(), // empty form_type
+              String::new(), String::new(), String::new(),
+              String::new(), String::new(), String::new(),
+              aux, case_prep, hidden,
             ];
-            // Pad person/form columns
-            row.resize(total_cols - 3, String::new());
-            row.push(sec);
-            row.push(sub);
-            row.push(hidden);
             rows.push(row);
           } else {
-            // Group conjugations by tense, preserving order
-            let mut by_tense: BTreeMap<String, Vec<(&str, &str)>> = BTreeMap::new();
+            // Group conjugations by form_type, preserving order
+            let mut by_form_type: BTreeMap<String, Vec<(&str, &str)>> = BTreeMap::new();
             for c in &v.conjugations {
-              by_tense.entry(c.tense.clone()).or_default().push((c.person.as_str(), c.form.as_str()));
+              by_form_type.entry(c.form_type.clone()).or_default().push((c.person.as_str(), c.form.as_str()));
             }
-            for (tense, pairs) in &by_tense {
+            for (form_type, pairs) in &by_form_type {
               let mut row = vec![
                 v.infinitive_source.clone(),
                 v.infinitive_target.clone(),
-                tense.clone(),
+                sec.clone(),
+                sub.clone(),
+                form_type.clone(),
               ];
-              for (person, form) in pairs {
-                row.push(format!("{} - {}", person, form));
+              // Write up to 6 person/form cells (cols 5-10)
+              for i in 0..6usize {
+                if let Some((person, form)) = pairs.get(i) {
+                  row.push(format!("{} - {}", person, form));
+                } else {
+                  row.push(String::new());
+                }
               }
-              // Pad to match total columns
-              while row.len() < total_cols - 3 {
-                row.push(String::new());
-              }
-              row.push(sec.clone());
-              row.push(sub.clone());
+              row.push(aux.clone());
+              row.push(case_prep.clone());
               row.push(hidden.clone());
               rows.push(row);
             }

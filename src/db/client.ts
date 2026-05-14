@@ -70,6 +70,8 @@ export async function runMigrations(): Promise<void> {
         infinitive_source TEXT NOT NULL,
         infinitive_target TEXT NOT NULL,
         disabled          INTEGER NOT NULL DEFAULT 0,
+        auxiliary         TEXT,
+        case_preposition  TEXT,
         created_at        TEXT NOT NULL DEFAULT (datetime('now'))
       )`
     );
@@ -77,11 +79,21 @@ export async function runMigrations(): Promise<void> {
     console.error('Verbs table migration failed:', e);
   }
   try {
+    await dbExecute('ALTER TABLE verbs ADD COLUMN auxiliary TEXT');
+  } catch {
+    // Column already exists — safe to ignore
+  }
+  try {
+    await dbExecute('ALTER TABLE verbs ADD COLUMN case_preposition TEXT');
+  } catch {
+    // Column already exists — safe to ignore
+  }
+  try {
     await dbExecute(
       `CREATE TABLE IF NOT EXISTS conjugations (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         verb_id    INTEGER NOT NULL REFERENCES verbs(id) ON DELETE CASCADE,
-        tense      TEXT NOT NULL,
+        form_type  TEXT NOT NULL,
         person     TEXT NOT NULL,
         form       TEXT NOT NULL,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -89,6 +101,11 @@ export async function runMigrations(): Promise<void> {
     );
   } catch (e) {
     console.error('Conjugations table migration failed:', e);
+  }
+  try {
+    await dbExecute('ALTER TABLE conjugations RENAME COLUMN tense TO form_type');
+  } catch {
+    // Already renamed — safe to ignore
   }
   _resolveReady();
 }

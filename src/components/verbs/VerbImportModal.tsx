@@ -10,7 +10,9 @@ interface ImportVerbRow {
   id: string;
   infinitive_source: string;
   infinitive_target: string;
-  conjugations: { tense: string; person: string; form: string }[];
+  auxiliary: string;
+  case_preposition: string;
+  conjugations: { form_type: string; person: string; form: string }[];
   conjugationCount: number;
   sectionName: string;
   subsectionName: string;
@@ -73,6 +75,8 @@ export function VerbImportModal({
           id: `v-${i}`,
           infinitive_source: v.infinitive_source,
           infinitive_target: v.infinitive_target,
+          auxiliary: v.auxiliary ?? '',
+          case_preposition: v.case_preposition ?? '',
           conjugations: v.conjugations,
           conjugationCount: v.conjugations.length,
           sectionName: v.section ?? '',
@@ -195,7 +199,15 @@ export function VerbImportModal({
         }
 
         await addVerb(
-          { level_id: targetLevelId, section_id: resolvedSubId, infinitive_source: vRow.infinitive_source, infinitive_target: vRow.infinitive_target, disabled: vRow.disabled },
+          {
+            level_id: targetLevelId,
+            section_id: resolvedSubId,
+            infinitive_source: vRow.infinitive_source,
+            infinitive_target: vRow.infinitive_target,
+            disabled: vRow.disabled,
+            auxiliary: vRow.auxiliary || null,
+            case_preposition: vRow.case_preposition || null,
+          },
           vRow.conjugations,
         );
         writtenLevelIds.add(targetLevelId);

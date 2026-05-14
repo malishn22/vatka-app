@@ -5,7 +5,7 @@ import type { ConjugationMode } from './uiStore';
 
 export interface ConjugationQuestion {
   verbInfinitive: string;
-  tense: string;
+  form_type: string;
   person: string;
   correctForm: string;
   verbId: number;
@@ -78,7 +78,7 @@ export const useConjugationPlayStore = create<ConjugationPlayState>((set, get) =
     const questions: ConjugationQuestion[] = verbs.flatMap((v) =>
       v.conjugations.map((c) => ({
         verbInfinitive: v.infinitive_target,
-        tense: c.tense,
+        form_type: c.form_type,
         person: c.person,
         correctForm: c.form,
         verbId: v.id,

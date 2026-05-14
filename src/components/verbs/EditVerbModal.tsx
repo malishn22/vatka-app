@@ -12,8 +12,8 @@ interface ConjugationEntry {
   form: string;
 }
 
-interface TenseGroup {
-  tense: string;
+interface FormTypeGroup {
+  formType: string;
   entries: ConjugationEntry[];
 }
 
@@ -25,38 +25,40 @@ interface EditVerbModalProps {
   onClose: () => void;
 }
 
-function groupConjugations(verb: VerbWithConjugations): TenseGroup[] {
+function groupConjugations(verb: VerbWithConjugations): FormTypeGroup[] {
   const groups: Record<string, ConjugationEntry[]> = {};
   for (const c of verb.conjugations) {
-    if (!groups[c.tense]) groups[c.tense] = [];
-    groups[c.tense].push({ person: c.person, form: c.form });
+    if (!groups[c.form_type]) groups[c.form_type] = [];
+    groups[c.form_type].push({ person: c.person, form: c.form });
   }
-  const result = Object.entries(groups).map(([tense, entries]) => ({ tense, entries }));
-  return result.length > 0 ? result : [{ tense: '', entries: [{ person: '', form: '' }] }];
+  const result = Object.entries(groups).map(([formType, entries]) => ({ formType, entries }));
+  return result.length > 0 ? result : [{ formType: '', entries: [{ person: '', form: '' }] }];
 }
 
 export function EditVerbModal({ verb, languageId, sourceLabel, targetLabel, onClose }: EditVerbModalProps) {
-  const { updateVerb, fetchUsedTenses, fetchUsedPersons } = useDataStore();
+  const { updateVerb, fetchUsedFormTypes, fetchUsedPersons } = useDataStore();
   const t = useT();
   const [infinitiveSource, setInfinitiveSource] = useState(verb.infinitive_source);
   const [infinitiveTarget, setInfinitiveTarget] = useState(verb.infinitive_target);
-  const [tenseGroups, setTenseGroups] = useState<TenseGroup[]>(groupConjugations(verb));
+  const [auxiliary, setAuxiliary] = useState(verb.auxiliary ?? '');
+  const [casePreposition, setCasePreposition] = useState(verb.case_preposition ?? '');
+  const [formTypeGroups, setFormTypeGroups] = useState<FormTypeGroup[]>(groupConjugations(verb));
   const [error, setError] = useState('');
-  const [usedTenses, setUsedTenses] = useState<string[]>([]);
+  const [usedFormTypes, setUsedFormTypes] = useState<string[]>([]);
   const [usedPersons, setUsedPersons] = useState<string[]>([]);
-  const [showTenseSuggestions, setShowTenseSuggestions] = useState<number | null>(null);
+  const [showFormTypeSuggestions, setShowFormTypeSuggestions] = useState<number | null>(null);
 
   useEffect(() => {
-    fetchUsedTenses(languageId).then(setUsedTenses);
+    fetchUsedFormTypes(languageId).then(setUsedFormTypes);
     fetchUsedPersons(languageId).then(setUsedPersons);
   }, [languageId]);
 
-  const updateTense = (groupIdx: number, tense: string) => {
-    setTenseGroups((prev) => prev.map((g, i) => i === groupIdx ? { ...g, tense } : g));
+  const updateFormType = (groupIdx: number, formType: string) => {
+    setFormTypeGroups((prev) => prev.map((g, i) => i === groupIdx ? { ...g, formType } : g));
   };
 
   const updateEntry = (groupIdx: number, entryIdx: number, field: 'person' | 'form', value: string) => {
-    setTenseGroups((prev) => prev.map((g, gi) =>
+    setFormTypeGroups((prev) => prev.map((g, gi) =>
       gi === groupIdx
         ? { ...g, entries: g.entries.map((e, ei) => ei === entryIdx ? { ...e, [field]: value } : e) }
         : g
@@ -64,29 +66,29 @@ export function EditVerbModal({ verb, languageId, sourceLabel, targetLabel, onCl
   };
 
   const addEntry = (groupIdx: number) => {
-    setTenseGroups((prev) => prev.map((g, i) =>
+    setFormTypeGroups((prev) => prev.map((g, i) =>
       i === groupIdx ? { ...g, entries: [...g.entries, { person: '', form: '' }] } : g
     ));
   };
 
   const removeEntry = (groupIdx: number, entryIdx: number) => {
-    setTenseGroups((prev) => prev.map((g, gi) =>
+    setFormTypeGroups((prev) => prev.map((g, gi) =>
       gi === groupIdx
         ? { ...g, entries: g.entries.filter((_, ei) => ei !== entryIdx) }
         : g
     ));
   };
 
-  const addTenseGroup = () => {
-    setTenseGroups((prev) => [...prev, { tense: '', entries: [{ person: '', form: '' }] }]);
+  const addFormTypeGroup = () => {
+    setFormTypeGroups((prev) => [...prev, { formType: '', entries: [{ person: '', form: '' }] }]);
   };
 
-  const removeTenseGroup = (groupIdx: number) => {
-    setTenseGroups((prev) => prev.filter((_, i) => i !== groupIdx));
+  const removeFormTypeGroup = (groupIdx: number) => {
+    setFormTypeGroups((prev) => prev.filter((_, i) => i !== groupIdx));
   };
 
   const fillPersons = (groupIdx: number) => {
-    const group = tenseGroups[groupIdx];
+    const group = formTypeGroups[groupIdx];
     const existingPersons = new Set(group.entries.map((e) => e.person.trim().toLowerCase()).filter(Boolean));
     const missingPersons = usedPersons.filter((p) => !existingPersons.has(p.toLowerCase()));
     if (missingPersons.length === 0) return;
@@ -97,17 +99,17 @@ export function EditVerbModal({ verb, languageId, sourceLabel, targetLabel, onCl
       ...missingPersons.map((p) => ({ person: p, form: '' })),
     ];
     const finalEntries = newEntries.length > 0 ? newEntries : missingPersons.map((p) => ({ person: p, form: '' }));
-    setTenseGroups((prev) => prev.map((g, i) => i === groupIdx ? { ...g, entries: finalEntries } : g));
+    setFormTypeGroups((prev) => prev.map((g, i) => i === groupIdx ? { ...g, entries: finalEntries } : g));
   };
 
   const getMissingPersonCount = (groupIdx: number) => {
-    const group = tenseGroups[groupIdx];
+    const group = formTypeGroups[groupIdx];
     const existingPersons = new Set(group.entries.map((e) => e.person.trim().toLowerCase()).filter(Boolean));
     return usedPersons.filter((p) => !existingPersons.has(p.toLowerCase())).length;
   };
 
-  const filteredTenses = (query: string) =>
-    usedTenses.filter((t) => t.toLowerCase().includes(query.toLowerCase()) && t.toLowerCase() !== query.toLowerCase());
+  const filteredFormTypes = (query: string) =>
+    usedFormTypes.filter((ft) => ft.toLowerCase().includes(query.toLowerCase()) && ft.toLowerCase() !== query.toLowerCase());
 
   const handleSave = async () => {
     if (!infinitiveSource.trim() || !infinitiveTarget.trim()) {
@@ -115,10 +117,10 @@ export function EditVerbModal({ verb, languageId, sourceLabel, targetLabel, onCl
       return;
     }
 
-    const validConjugations = tenseGroups.flatMap((g) =>
+    const validConjugations = formTypeGroups.flatMap((g) =>
       g.entries
-        .filter((e) => e.person.trim() && e.form.trim() && g.tense.trim())
-        .map((e) => ({ tense: g.tense.trim(), person: e.person.trim(), form: e.form.trim() }))
+        .filter((e) => e.person.trim() && e.form.trim() && g.formType.trim())
+        .map((e) => ({ form_type: g.formType.trim(), person: e.person.trim(), form: e.form.trim() }))
     );
 
     if (validConjugations.length === 0) {
@@ -128,7 +130,12 @@ export function EditVerbModal({ verb, languageId, sourceLabel, targetLabel, onCl
 
     await updateVerb(
       verb.id,
-      { infinitive_source: infinitiveSource.trim(), infinitive_target: infinitiveTarget.trim() },
+      {
+        infinitive_source: infinitiveSource.trim(),
+        infinitive_target: infinitiveTarget.trim(),
+        auxiliary: auxiliary.trim() || null,
+        case_preposition: casePreposition.trim() || null,
+      },
       validConjugations
     );
     onClose();
@@ -166,32 +173,52 @@ export function EditVerbModal({ verb, languageId, sourceLabel, targetLabel, onCl
           </div>
         </div>
 
-        {/* Tense groups */}
-        {tenseGroups.map((group, gi) => (
+        {/* Auxiliary + Case/Preposition */}
+        <div className="flex gap-3">
+          <div className="flex-1">
+            <Input
+              label="Auxiliary"
+              placeholder="e.g. Haben"
+              value={auxiliary}
+              onChange={(e) => setAuxiliary(e.target.value)}
+            />
+          </div>
+          <div className="flex-1">
+            <Input
+              label="Case/Preposition"
+              placeholder="e.g. Akk."
+              value={casePreposition}
+              onChange={(e) => setCasePreposition(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Form type groups */}
+        {formTypeGroups.map((group, gi) => (
           <div key={gi} className="p-3 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
             <div className="flex items-center gap-2 mb-2">
               <div className="flex-1 relative">
                 <Input
                   inputSize="sm"
-                  placeholder={t.tenseName}
-                  value={group.tense}
-                  onChange={(e) => { updateTense(gi, e.target.value); setShowTenseSuggestions(gi); }}
-                  onFocus={() => setShowTenseSuggestions(gi)}
-                  onBlur={() => setTimeout(() => setShowTenseSuggestions(null), 150)}
+                  placeholder={t.formTypeName}
+                  value={group.formType}
+                  onChange={(e) => { updateFormType(gi, e.target.value); setShowFormTypeSuggestions(gi); }}
+                  onFocus={() => setShowFormTypeSuggestions(gi)}
+                  onBlur={() => setTimeout(() => setShowFormTypeSuggestions(null), 150)}
                 />
-                {showTenseSuggestions === gi && group.tense && filteredTenses(group.tense).length > 0 && (
+                {showFormTypeSuggestions === gi && group.formType && filteredFormTypes(group.formType).length > 0 && (
                   <div className="absolute z-10 top-full mt-1 w-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded shadow-lg max-h-32 overflow-y-auto">
-                    {filteredTenses(group.tense).map((t) => (
-                      <button key={t} className="w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200"
-                        onMouseDown={() => { updateTense(gi, t); setShowTenseSuggestions(null); }}>
-                        {t}
+                    {filteredFormTypes(group.formType).map((ft) => (
+                      <button key={ft} className="w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200"
+                        onMouseDown={() => { updateFormType(gi, ft); setShowFormTypeSuggestions(null); }}>
+                        {ft}
                       </button>
                     ))}
                   </div>
                 )}
               </div>
-              {tenseGroups.length > 1 && (
-                <Button variant="icon" hoverColor="red" onClick={() => removeTenseGroup(gi)} title={t.delete}>
+              {formTypeGroups.length > 1 && (
+                <Button variant="icon" hoverColor="red" onClick={() => removeFormTypeGroup(gi)} title={t.delete}>
                   <TrashIcon size={16} />
                 </Button>
               )}
@@ -241,8 +268,8 @@ export function EditVerbModal({ verb, languageId, sourceLabel, targetLabel, onCl
           </div>
         ))}
 
-        <Button onClick={addTenseGroup}>
-          {t.addTense}
+        <Button onClick={addFormTypeGroup}>
+          {t.addFormType}
         </Button>
 
         {error && <p className="text-xs text-red-600">{error}</p>}

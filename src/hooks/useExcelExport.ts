@@ -96,8 +96,10 @@ export function useExcelExport({ wordPairs, sections, level, language, onSuccess
           level_id: v.level_id,
           section_id: v.section_id,
           disabled: Boolean(v.disabled),
+          auxiliary: v.auxiliary ?? null,
+          case_preposition: v.case_preposition ?? null,
           conjugations: v.conjugations.map(c => ({
-            tense: c.tense, person: c.person, form: c.form,
+            form_type: c.form_type, person: c.person, form: c.form,
           })),
         })) ?? null,
       },
@@ -126,25 +128,16 @@ export function useExcelExport({ wordPairs, sections, level, language, onSuccess
 
     // If verb-only export (no word pairs), export verbs CSV with flat tense rows
     if (pairs.length === 0 && verbsData && verbsData.length > 0) {
-      // Find max conjugations per tense across all verbs
-      let maxConjs = 0;
-      for (const v of verbsData) {
-        const byTense = new Map<string, number>();
-        for (const c of v.conjugations) {
-          byTense.set(c.tense, (byTense.get(c.tense) ?? 0) + 1);
-        }
-        for (const count of byTense.values()) {
-          if (count > maxConjs) maxConjs = count;
-        }
-      }
-
-      // Build header (each conjugation is a single column: "person - form")
-      const headerParts = ['Source Infinitive', 'Target Infinitive', 'Tense'];
-      for (let i = 1; i <= maxConjs; i++) {
-        headerParts.push(`Person/Form ${i}`);
-      }
-      headerParts.push('Section', 'Subsection', 'Hidden');
-      const totalCols = headerParts.length;
+      // Fixed 14-column German Journey verb format:
+      // 0: Source Infinitive, 1: Target Infinitive, 2: Section, 3: Subsection,
+      // 4: Form Type, 5-10: Person/Form 1-6, 11: Auxiliary, 12: Case/Preposition, 13: Hidden
+      const headerParts = [
+        'Source Infinitive', 'Target Infinitive',
+        'Section', 'Subsection', 'Form Type',
+        'Person/Form 1', 'Person/Form 2', 'Person/Form 3',
+        'Person/Form 4', 'Person/Form 5', 'Person/Form 6',
+        'Auxiliary', 'Case/Preposition', 'Hidden',
+      ];
 
       const csvLines = [headerParts.map(escapeCell).join(',')];
 
@@ -152,26 +145,36 @@ export function useExcelExport({ wordPairs, sections, level, language, onSuccess
         const lvlName = levelMap.get(v.level_id) ?? '';
         const secName = v.section_id != null ? (sectionMap.get(v.section_id) ?? '') : '';
         const hidden = v.disabled ? 'Hidden' : 'Shown';
+        const aux = v.auxiliary ?? '';
+        const casePrep = v.case_preposition ?? '';
 
         if (v.conjugations.length === 0) {
-          const row = [escapeCell(v.infinitive_source), escapeCell(v.infinitive_target), ''];
-          while (row.length < totalCols - 3) row.push('');
-          row.push(escapeCell(lvlName), escapeCell(secName), escapeCell(hidden));
+          const row = [
+            escapeCell(v.infinitive_source), escapeCell(v.infinitive_target),
+            escapeCell(lvlName), escapeCell(secName), '',
+            '', '', '', '', '', '',
+            escapeCell(aux), escapeCell(casePrep), escapeCell(hidden),
+          ];
           csvLines.push(row.join(','));
         } else {
-          // Group by tense
-          const byTense = new Map<string, { person: string; form: string }[]>();
+          // Group by form_type
+          const byFormType = new Map<string, { person: string; form: string }[]>();
           for (const c of v.conjugations) {
-            if (!byTense.has(c.tense)) byTense.set(c.tense, []);
-            byTense.get(c.tense)!.push({ person: c.person, form: c.form });
+            if (!byFormType.has(c.form_type)) byFormType.set(c.form_type, []);
+            byFormType.get(c.form_type)!.push({ person: c.person, form: c.form });
           }
-          for (const [tense, tPairs] of byTense) {
-            const row = [escapeCell(v.infinitive_source), escapeCell(v.infinitive_target), escapeCell(tense)];
-            for (const { person, form } of tPairs) {
-              row.push(escapeCell(`${person} - ${form}`));
+          for (const [formType, tPairs] of byFormType) {
+            const personForms: string[] = [];
+            for (let i = 0; i < 6; i++) {
+              const p = tPairs[i];
+              personForms.push(p ? escapeCell(`${p.person} - ${p.form}`) : '');
             }
-            while (row.length < totalCols - 3) row.push('');
-            row.push(escapeCell(lvlName), escapeCell(secName), escapeCell(hidden));
+            const row = [
+              escapeCell(v.infinitive_source), escapeCell(v.infinitive_target),
+              escapeCell(lvlName), escapeCell(secName), escapeCell(formType),
+              ...personForms,
+              escapeCell(aux), escapeCell(casePrep), escapeCell(hidden),
+            ];
             csvLines.push(row.join(','));
           }
         }

@@ -82,7 +82,7 @@ export function ConjugationPlayView() {
             {currentQuestion.verbInfinitive}
           </span>
           <div className="mt-1 text-sm text-indigo-600 dark:text-indigo-300">
-            {currentQuestion.tense} &mdash; {currentQuestion.person}
+            {currentQuestion.form_type} &mdash; {currentQuestion.person}
           </div>
         </div>
       </div>

@@ -20,7 +20,7 @@ interface ImportVerbRow {
   id: string;
   infinitive_source: string;
   infinitive_target: string;
-  conjugations: { tense: string; person: string; form: string }[];
+  conjugations: { form_type: string; person: string; form: string }[];
   conjugationCount: number;
   sectionName: string;
   subsectionName: string;

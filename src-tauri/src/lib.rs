@@ -32,12 +32,14 @@ CREATE TABLE IF NOT EXISTS verbs (
   infinitive_source TEXT NOT NULL,
   infinitive_target TEXT NOT NULL,
   disabled          INTEGER NOT NULL DEFAULT 0,
+  auxiliary         TEXT,
+  case_preposition  TEXT,
   created_at        TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS conjugations (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   verb_id    INTEGER NOT NULL REFERENCES verbs(id) ON DELETE CASCADE,
-  tense      TEXT NOT NULL,
+  form_type  TEXT NOT NULL,
   person     TEXT NOT NULL,
   form       TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
