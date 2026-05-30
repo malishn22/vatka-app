@@ -479,7 +479,7 @@ pub fn build_xlsx(payload: ExportPayload) -> Result<Vec<u8>, String> {
 
       for sec_id in &verb_section_ids {
         let sec_verbs: Vec<&ExportVerb> = verbs.iter().filter(|v| v.section_id == *sec_id).collect();
-        let sec_label = section_map.get(sec_id).cloned().unwrap_or_else(|| sec_id.to_string());
+        let sec_label = section_map.get(sec_id).cloned().unwrap_or_else(|| "Unknown".to_string());
         let mut sheet_name = format!("Verbs - {}", sec_label).chars().take(31).collect::<String>();
 
         // Deduplicate sheet names

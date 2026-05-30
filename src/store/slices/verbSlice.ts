@@ -5,7 +5,10 @@ import type { Verb, Conjugation, VerbWithConjugations } from '../../types';
 
 export interface VerbSlice {
   verbs: VerbWithConjugations[];
+  allLanguageVerbs: VerbWithConjugations[];
+  allLanguageVerbsLoadedFor: number | null;
   fetchVerbs: (sectionId: number) => Promise<void>;
+  fetchVerbsForLanguage: (languageId: number) => Promise<void>;
   addVerb: (verb: Omit<Verb, 'id' | 'created_at'>, conjugations: Omit<Conjugation, 'id' | 'verb_id' | 'created_at'>[]) => Promise<void>;
   updateVerb: (id: number, verb: Partial<Omit<Verb, 'id' | 'created_at'>>, conjugations: Omit<Conjugation, 'id' | 'verb_id' | 'created_at'>[]) => Promise<void>;
   deleteVerb: (id: number) => Promise<void>;
@@ -18,6 +21,37 @@ export interface VerbSlice {
 
 export const createVerbSlice: StateCreator<any, [], [], VerbSlice> = (set, get) => ({
   verbs: [],
+  allLanguageVerbs: [],
+  allLanguageVerbsLoadedFor: null,
+
+  fetchVerbsForLanguage: async (languageId) => {
+    try {
+      const verbRows = await dbSelect<Verb & { disabled: number | boolean }>(
+        `SELECT v.* FROM verbs v
+         JOIN sections s ON v.section_id = s.id
+         WHERE s.language_id = ?
+         ORDER BY v.id`,
+        [languageId]
+      );
+      const conjugationRows = await dbSelect<Conjugation>(
+        `SELECT c.* FROM conjugations c
+         JOIN verbs v ON c.verb_id = v.id
+         JOIN sections s ON v.section_id = s.id
+         WHERE s.language_id = ?
+         ORDER BY c.id`,
+        [languageId]
+      );
+      const allLanguageVerbs: VerbWithConjugations[] = verbRows.map((v) => ({
+        ...v,
+        disabled: toBool(v.disabled),
+        subsection_id: v.subsection_id ?? null,
+        conjugations: conjugationRows.filter((c) => c.verb_id === v.id),
+      }));
+      set({ allLanguageVerbs, allLanguageVerbsLoadedFor: languageId });
+    } catch (e) {
+      set({ error: String(e) });
+    }
+  },
 
   fetchVerbs: async (sectionId) => {
     try {
@@ -55,6 +89,7 @@ export const createVerbSlice: StateCreator<any, [], [], VerbSlice> = (set, get) 
         );
       }
     } finally {
+      set({ allLanguageVerbsLoadedFor: null });
       await get().fetchVerbs(verb.section_id);
     }
   },
@@ -83,6 +118,7 @@ export const createVerbSlice: StateCreator<any, [], [], VerbSlice> = (set, get) 
         [id, c.form_type, c.person, c.form]
       );
     }
+    set({ allLanguageVerbsLoadedFor: null });
     await get().fetchVerbs(sectionId);
   },
 
@@ -90,7 +126,10 @@ export const createVerbSlice: StateCreator<any, [], [], VerbSlice> = (set, get) 
     const verb = get().verbs.find((v: VerbWithConjugations) => v.id === id);
     if (!verb) return;
     await dbExecute('DELETE FROM verbs WHERE id = ?', [id]);
-    set((state: any) => ({ verbs: state.verbs.filter((v: VerbWithConjugations) => v.id !== id) }));
+    set((state: any) => ({
+      verbs: state.verbs.filter((v: VerbWithConjugations) => v.id !== id),
+      allLanguageVerbsLoadedFor: null,
+    }));
   },
 
   toggleVerbDisabled: async (id) => {
@@ -100,6 +139,7 @@ export const createVerbSlice: StateCreator<any, [], [], VerbSlice> = (set, get) 
     await dbExecute('UPDATE verbs SET disabled = ? WHERE id = ?', [newDisabled, id]);
     set((state: any) => ({
       verbs: state.verbs.map((v: VerbWithConjugations) => v.id === id ? { ...v, disabled: !v.disabled } : v),
+      allLanguageVerbsLoadedFor: null,
     }));
   },
 
@@ -128,6 +168,7 @@ export const createVerbSlice: StateCreator<any, [], [], VerbSlice> = (set, get) 
       'UPDATE verbs SET section_id = ?, subsection_id = ? WHERE id = ?',
       [sectionId, subsectionId, id]
     );
+    set({ allLanguageVerbsLoadedFor: null });
     await get().fetchVerbs(sourceLevelId);
   },
 

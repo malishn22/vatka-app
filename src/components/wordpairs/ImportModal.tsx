@@ -41,7 +41,6 @@ interface ImportModalProps {
   sourceLabel: string;
   targetLabel: string;
   onImported: (count: number, skipped: number) => void;
-  mode?: 'both' | 'verb';
 }
 
 export function ImportModal({
@@ -54,7 +53,6 @@ export function ImportModal({
   sourceLabel,
   targetLabel,
   onImported,
-  mode = 'both',
 }: ImportModalProps) {
   const t = useT();
   const { addWordPair, addVerb, addSubsection, addSection, wordPairExistsInLanguage, verbExistsInLanguage, fetchWordPairs, fetchVerbs } = useDataStore();
@@ -81,23 +79,21 @@ export function ImportModal({
     setIsChecking(true);
     setImportError(null);
     try {
-      if (mode !== 'verb') {
-        const built: ImportRow[] = [];
-        for (let i = 0; i < result.pairs.length; i++) {
-          const { source, target, section, subsection } = result.pairs[i];
-          const isDuplicate = await wordPairExistsInLanguage(language.id, source, target);
-          built.push({
-            id: `p-${i}`,
-            source,
-            target,
-            sectionName: section ?? '',
-            subsectionName: subsection ?? '',
-            isDuplicate,
-            disabled: result.pairs[i].disabled ?? false,
-          });
-        }
-        setRows(built);
+      const built: ImportRow[] = [];
+      for (let i = 0; i < result.pairs.length; i++) {
+        const { source, target, section, subsection } = result.pairs[i];
+        const isDuplicate = await wordPairExistsInLanguage(language.id, source, target);
+        built.push({
+          id: `p-${i}`,
+          source,
+          target,
+          sectionName: section ?? '',
+          subsectionName: subsection ?? '',
+          isDuplicate,
+          disabled: result.pairs[i].disabled ?? false,
+        });
       }
+      setRows(built);
 
       const builtVerbs: ImportVerbRow[] = [];
       for (let i = 0; i < result.verbs.length; i++) {
@@ -122,7 +118,7 @@ export function ImportModal({
     } finally {
       setIsChecking(false);
     }
-  }, [language.id, mode, wordPairExistsInLanguage, verbExistsInLanguage]);
+  }, [language.id, wordPairExistsInLanguage, verbExistsInLanguage]);
 
   const { triggerImport, fileInputProps } = useExcelImport(
     handleParsed,
@@ -144,6 +140,12 @@ export function ImportModal({
 
   const updateVerbRowSubsection = (id: string, value: string) =>
     setVerbRows(prev => prev.map(r => r.id === id ? { ...r, subsectionName: value } : r));
+
+  const updateVerbRowAuxiliary = (id: string, value: string) =>
+    setVerbRows(prev => prev.map(r => r.id === id ? { ...r, auxiliary: value } : r));
+
+  const updateVerbRowCasePreposition = (id: string, value: string) =>
+    setVerbRows(prev => prev.map(r => r.id === id ? { ...r, case_preposition: value } : r));
 
   const removeVerbRow = (id: string) =>
     setVerbRows(prev => prev.filter(r => r.id !== id));
@@ -222,8 +224,7 @@ export function ImportModal({
   const existingSubsectionNames = subsections.map(s => s.name);
   const sectionNames = sections.map(s => s.name);
 
-  const isVerbMode = mode === 'verb';
-  const modalTitle = isVerbMode ? t.importVerbs : t.importExcel;
+  const modalTitle = t.importExcel;
 
   // --- Step 1: Select file ---
   if (step === 'select-file') {
@@ -253,9 +254,7 @@ export function ImportModal({
   // --- Step 2: Preview ---
   const totalItems = rows.length + verbRows.length;
   const totalDuplicates = duplicateCount + verbDuplicateCount;
-  const previewTitle = isVerbMode
-    ? t.importVerbPreviewTitle(verbRows.length)
-    : t.importPreviewTitle(totalItems);
+  const previewTitle = t.importPreviewTitle(totalItems);
 
   const footer = (
     <>
@@ -263,16 +262,16 @@ export function ImportModal({
         {t.importBack}
       </Button>
       <Button variant="primary" onClick={handleImport} disabled={isImporting || totalToImport === 0}>
-        {isImporting ? '...' : (isVerbMode ? t.importVerbToImport(verbsToImportCount) : t.importToImport(totalToImport))}
+        {isImporting ? '...' : t.importToImport(totalToImport)}
       </Button>
     </>
   );
 
-  const datalistId = isVerbMode ? 'verb-import-section-datalist' : 'import-section-datalist';
-  const subsectionDatalistId = isVerbMode ? 'verb-import-subsection-datalist' : 'import-subsection-datalist';
+  const datalistId = 'import-section-datalist';
+  const subsectionDatalistId = 'import-subsection-datalist';
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={previewTitle} footer={footer} size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title={previewTitle} footer={footer} size="xl">
       <div className="flex flex-col gap-3">
         {totalDuplicates > 0 && (
           <p className="text-xs text-amber-600 dark:text-amber-400">
@@ -362,9 +361,7 @@ export function ImportModal({
         {/* Verb Table */}
         {verbRows.length > 0 && (
           <>
-            {!isVerbMode && (
-              <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{t.verbsTab} ({verbRows.length})</p>
-            )}
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{t.verbsTab} ({verbRows.length})</p>
             <div className="overflow-x-auto max-h-56 overflow-y-auto rounded border border-gray-200 dark:border-gray-700">
               <table className="w-full text-sm border-collapse">
                 <thead className="sticky top-0 bg-gray-50 dark:bg-gray-700">
@@ -372,6 +369,8 @@ export function ImportModal({
                     <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">{sourceLabel}</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">{targetLabel}</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">{t.forms}</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">{t.auxiliary}</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">{t.casePreposition}</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">{t.exportSectionColumn}</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">{t.exportSubsectionColumn}</th>
                     <th className="px-2 py-2 w-6"></th>
@@ -386,6 +385,26 @@ export function ImportModal({
                       <td className="px-3 py-1.5 text-gray-800 dark:text-gray-200 truncate max-w-0">{vRow.infinitive_source}</td>
                       <td className="px-3 py-1.5 text-gray-800 dark:text-gray-200 truncate max-w-0">{vRow.infinitive_target}</td>
                       <td className="px-3 py-1.5 text-gray-400 dark:text-gray-500 text-xs">{vRow.conjugationCount}</td>
+                      <td className="px-3 py-1.5">
+                        {vRow.isDuplicate ? null : (
+                          <input
+                            type="text"
+                            value={vRow.auxiliary}
+                            onChange={e => updateVerbRowAuxiliary(vRow.id, e.target.value)}
+                            className="w-full text-xs px-2 py-1 rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                          />
+                        )}
+                      </td>
+                      <td className="px-3 py-1.5">
+                        {vRow.isDuplicate ? null : (
+                          <input
+                            type="text"
+                            value={vRow.case_preposition}
+                            onChange={e => updateVerbRowCasePreposition(vRow.id, e.target.value)}
+                            className="w-full text-xs px-2 py-1 rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                          />
+                        )}
+                      </td>
                       <td className="px-3 py-1.5">
                         {vRow.isDuplicate ? null : (
                           <input

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { useToggleSelection } from '../../hooks/useToggleSelection';
 import { useUIStore } from '../../store/uiStore';
@@ -7,16 +7,17 @@ import { useDragContext } from '../../context/DragContext';
 import { VerbRow } from './VerbRow';
 import { AddVerbForm } from './AddVerbForm';
 import { EditVerbModal } from './EditVerbModal';
-import { VerbExportModal } from './VerbExportModal';
-import { VerbImportModal } from './VerbImportModal';
+import { ExportModal } from '../wordpairs/ExportModal';
+import { ImportModal } from '../wordpairs/ImportModal';
 import { Button } from '../shared/Button';
 import { Toast } from '../shared/Toast';
+import { SearchBar } from '../shared/SearchBar';
 import { useT } from '../../i18n/useT';
 import type { VerbWithConjugations } from '../../types';
 
 export function VerbsView() {
-  const { selectedSectionId, selectedSubsectionId, selectedLanguageId } = useUIStore();
-  const { sections, languages, verbs, subsections, fetchVerbs } = useDataStore();
+  const { selectedSectionId, selectedSubsectionId, selectedLanguageId, setSelectedSection, setSelectedSubsection } = useUIStore();
+  const { sections, languages, verbs, subsections, wordPairs, fetchVerbs, allLanguageVerbs, allLanguageVerbsLoadedFor, fetchVerbsForLanguage } = useDataStore();
   const { selectedVerbIds, setSelectedVerbIds } = useDragContext();
   const t = useT();
   const [addFormOpen, setAddFormOpen] = useState(false);
@@ -24,6 +25,8 @@ export function VerbsView() {
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<'xlsx' | 'csv' | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [searchGlobal, setSearchGlobal] = useState(false);
   const addFormRef = useRef<HTMLDivElement>(null);
 
   const { toggle: handleToggleVerbSelect } = useToggleSelection(selectedVerbIds, setSelectedVerbIds);
@@ -40,15 +43,46 @@ export function VerbsView() {
     }
   }, [selectedSectionId]);
 
-  const displayedVerbs = selectedSubsectionId !== null
+  useEffect(() => {
+    setSearch('');
+    setSearchGlobal(false);
+  }, [selectedSectionId, selectedSubsectionId, selectedLanguageId]);
+
+  useEffect(() => {
+    if (searchGlobal && selectedLanguageId !== null && allLanguageVerbsLoadedFor !== selectedLanguageId) {
+      fetchVerbsForLanguage(selectedLanguageId);
+    }
+  }, [searchGlobal, selectedLanguageId, allLanguageVerbsLoadedFor]);
+
+  const query = search.trim().toLowerCase();
+  const sectionScopedVerbs = selectedSubsectionId !== null
     ? verbs.filter((v) => v.subsection_id === selectedSubsectionId)
     : verbs;
-  const showSection = selectedSubsectionId === null;
+  const displayedVerbs = useMemo(() => {
+    if (!query) return sectionScopedVerbs;
+    const source = searchGlobal ? allLanguageVerbs : sectionScopedVerbs;
+    return source.filter(
+      (v) =>
+        v.infinitive_source.toLowerCase().includes(query) ||
+        v.infinitive_target.toLowerCase().includes(query)
+    );
+  }, [query, searchGlobal, allLanguageVerbs, sectionScopedVerbs]);
+  const showGlobalColumns = query.length > 0 && searchGlobal;
+  const showSection = selectedSubsectionId === null || showGlobalColumns;
 
   if (!section) return null;
 
   return (
     <div>
+      <div className="mb-4">
+        <SearchBar
+          value={search}
+          onChange={setSearch}
+          isGlobal={searchGlobal}
+          onGlobalChange={setSearchGlobal}
+        />
+      </div>
+
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -83,12 +117,12 @@ export function VerbsView() {
               />
               <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 flex gap-2">
                 <Button variant="secondary" onClick={() => { setImportModalOpen(true); setAddFormOpen(false); }}>
-                  {t.importVerbs}
+                  {t.importExcel}
                 </Button>
-                <Button variant="secondary" onClick={() => { setExportFormat('xlsx'); setAddFormOpen(false); }} disabled={verbs.length === 0}>
+                <Button variant="secondary" onClick={() => { setExportFormat('xlsx'); setAddFormOpen(false); }}>
                   {t.exportExcel}
                 </Button>
-                <Button variant="secondary" onClick={() => { setExportFormat('csv'); setAddFormOpen(false); }} disabled={verbs.length === 0}>
+                <Button variant="secondary" onClick={() => { setExportFormat('csv'); setAddFormOpen(false); }}>
                   {t.exportCsv}
                 </Button>
               </div>
@@ -99,21 +133,31 @@ export function VerbsView() {
 
       {displayedVerbs.length === 0 && !addFormOpen ? (
         <div className="text-center py-8 text-gray-400 dark:text-gray-500">
-          <p>{t.noVerbsYet}</p>
+          <p>{query ? t.searchNoResults : t.noVerbsYet}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
-          {displayedVerbs.map((verb) => (
-            <VerbRow
-              key={verb.id}
-              verb={verb}
-              onEdit={setEditingVerb}
-              showSection={showSection}
-              subsectionName={subsections.find((s) => s.id === verb.subsection_id)?.name}
-              isSelected={selectedVerbIds.includes(verb.id)}
-              onToggleSelect={(additive) => handleToggleVerbSelect(verb.id, additive)}
-            />
-          ))}
+          {displayedVerbs.map((verb) => {
+            const isExternal = showGlobalColumns && verb.section_id !== selectedSectionId;
+            return (
+              <VerbRow
+                key={verb.id}
+                verb={verb}
+                onEdit={setEditingVerb}
+                showSection={showSection}
+                sectionName={showGlobalColumns ? sections.find((s) => s.id === verb.section_id)?.name : undefined}
+                subsectionName={subsections.find((s) => s.id === verb.subsection_id)?.name}
+                isSelected={selectedVerbIds.includes(verb.id)}
+                onToggleSelect={(additive) => handleToggleVerbSelect(verb.id, additive)}
+                onRowClick={isExternal ? () => {
+                  setSelectedSection(verb.section_id);
+                  setSelectedSubsection(verb.subsection_id);
+                  setSearch('');
+                  setSearchGlobal(false);
+                } : undefined}
+              />
+            );
+          })}
         </div>
       )}
 
@@ -128,7 +172,7 @@ export function VerbsView() {
       )}
 
       {language && (
-        <VerbImportModal
+        <ImportModal
           isOpen={importModalOpen}
           onClose={() => setImportModalOpen(false)}
           sectionId={section.id}
@@ -139,13 +183,13 @@ export function VerbsView() {
           targetLabel={language.target}
           onImported={(count, skipped) => {
             setImportModalOpen(false);
-            setToastMsg(t.verbsImportResult(count, skipped));
+            setToastMsg(t.importResult(count, skipped));
           }}
         />
       )}
 
       {exportFormat !== null && language && (
-        <VerbExportModal
+        <ExportModal
           isOpen={exportFormat !== null}
           onClose={() => setExportFormat(null)}
           format={exportFormat}
@@ -153,7 +197,7 @@ export function VerbsView() {
           sections={languageSections}
           currentSectionId={section.id}
           subsections={sectionSubsections}
-          verbs={verbs}
+          wordPairs={wordPairs}
           onSuccess={() => setToastMsg(t.exportedSuccessfully)}
         />
       )}

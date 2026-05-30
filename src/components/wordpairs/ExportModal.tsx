@@ -176,7 +176,10 @@ export function ExportModal({
       const referencedSubsectionIds = new Set(
         selectedPairs.map(p => p.subsection_id).filter((id): id is number => id !== null)
       );
-      const referencedSectionIds = new Set(selectedPairs.map(p => p.section_id));
+      const referencedSectionIds = new Set<number>([
+        ...selectedPairs.map(p => p.section_id),
+        ...allVerbs.map(v => v.section_id),
+      ]);
       const filteredSubsections = allSubsections.filter(s => referencedSubsectionIds.has(s.id));
       const filteredSections = sections.filter(s => referencedSectionIds.has(s.id));
       const payload: ExportPayload = {
@@ -246,7 +249,7 @@ export function ExportModal({
   const showSectionCol = selectedSectionIds.size > 1;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={t.exportModalTitle} footer={footer} size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title={t.exportModalTitle} footer={footer} size="xl">
       <div className="flex flex-col gap-3">
         {exportError && (
           <p className="text-xs text-red-600 dark:text-red-400">

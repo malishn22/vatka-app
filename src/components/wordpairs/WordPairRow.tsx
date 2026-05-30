@@ -13,11 +13,13 @@ interface WordPairRowProps {
   pair: WordPair;
   showSection?: boolean;
   subsections?: Subsection[];
+  sectionName?: string;
   isSelected?: boolean;
   onToggleSelect?: (additive: boolean) => void;
+  onRowClick?: () => void;
 }
 
-export function WordPairRow({ pair, showSection, subsections, isSelected = false, onToggleSelect }: WordPairRowProps) {
+export function WordPairRow({ pair, showSection, subsections, sectionName, isSelected = false, onToggleSelect, onRowClick }: WordPairRowProps) {
   const { updateWordPair, deleteWordPair } = useDataStore();
   const { draggingPairIds, setDraggingPairIds, selectedPairIds, setSelectedPairIds } = useDragContext();
   const t = useT();
@@ -39,6 +41,10 @@ export function WordPairRow({ pair, showSection, subsections, isSelected = false
   };
 
   const handleRowClick = (e: React.MouseEvent) => {
+    if (onRowClick && !e.metaKey && !e.ctrlKey) {
+      onRowClick();
+      return;
+    }
     if (onToggleSelect) {
       onToggleSelect(e.metaKey || e.ctrlKey);
     }
@@ -86,7 +92,10 @@ export function WordPairRow({ pair, showSection, subsections, isSelected = false
         </td>
         {showSection && (
           <td className="px-4 py-2">
-            <SectionBadge name={subsections?.find((s) => s.id === pair.subsection_id)?.name} />
+            <div className="flex items-center gap-1.5">
+              {sectionName && <SectionBadge name={sectionName} />}
+              <SectionBadge name={subsections?.find((s) => s.id === pair.subsection_id)?.name} />
+            </div>
           </td>
         )}
         <td className="px-4 py-2 text-right">
@@ -118,7 +127,10 @@ export function WordPairRow({ pair, showSection, subsections, isSelected = false
       <td className="px-4 py-2.5 text-sm text-gray-800 dark:text-gray-200">{pair.target}</td>
       {showSection && (
         <td className="px-4 py-2.5">
-          <SectionBadge name={subsections?.find((s) => s.id === pair.subsection_id)?.name} />
+          <div className="flex items-center gap-1.5">
+            {sectionName && <SectionBadge name={sectionName} />}
+            <SectionBadge name={subsections?.find((s) => s.id === pair.subsection_id)?.name} />
+          </div>
         </td>
       )}
       <td className="px-4 py-2.5 text-right">

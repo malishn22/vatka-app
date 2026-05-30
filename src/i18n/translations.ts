@@ -71,7 +71,7 @@ export const translations = {
     // Import modal
     importChooseFile: 'Choose File',
     importFileHint: 'Accepts .xlsx, .ods, .csv',
-    importFormatHint: 'Columns: Source | Target | Section | Subsection (optional)',
+    importFormatHint: 'Columns: Source | Target | Section | Subsection | Auxiliary | Case/Preposition | Form Type | Person/Form 1–6',
     importPreviewTitle: (n: number) => `Preview — ${n} pairs`,
     importToImport: (n: number) => `Import ${n} pairs`,
     importDuplicateLabel: 'Duplicate',
@@ -165,6 +165,11 @@ export const translations = {
     wordPairsTab: 'Word Pairs',
     verbsTab: 'Verbs',
 
+    // Search
+    searchPlaceholder: 'Search...',
+    searchGlobal: 'Global',
+    searchNoResults: 'No matches',
+
     // Verbs
     verb: 'verb',
     verbs: 'verbs',
@@ -175,6 +180,8 @@ export const translations = {
     formType: 'form type',
     formTypes: 'form types',
     forms: 'forms',
+    auxiliary: 'Auxiliary',
+    casePreposition: 'Case/Preposition',
     formTypeName: 'Form type name (e.g. Present, Past)',
     person: 'Person (e.g. yo, tu, el)',
     conjugatedForm: 'Conjugated form',
@@ -306,7 +313,7 @@ export const translations = {
     // Import modal
     importChooseFile: 'Dosya Seç',
     importFileHint: '.xlsx, .ods, .csv desteklenir',
-    importFormatHint: 'Sütunlar: Kaynak | Hedef | Bölüm | Alt Bölüm (isteğe bağlı)',
+    importFormatHint: 'Sütunlar: Kaynak | Hedef | Bölüm | Alt Bölüm | Yardımcı | Durum/Edat | Form Tipi | Kişi/Form 1–6',
     importPreviewTitle: (n: number) => `Önizleme — ${n} çift`,
     importToImport: (n: number) => `${n} çift içe aktar`,
     importDuplicateLabel: 'Tekrar',
@@ -400,6 +407,11 @@ export const translations = {
     wordPairsTab: 'Kelime Çiftleri',
     verbsTab: 'Fiiller',
 
+    // Search
+    searchPlaceholder: 'Ara...',
+    searchGlobal: 'Genel',
+    searchNoResults: 'Eşleşme yok',
+
     // Verbs
     verb: 'fiil',
     verbs: 'fiil',
@@ -410,6 +422,8 @@ export const translations = {
     formType: 'form tipi',
     formTypes: 'form tipleri',
     forms: 'form',
+    auxiliary: 'Yardımcı',
+    casePreposition: 'Durum/Edat',
     formTypeName: 'Form tipi adı (örn. Şimdiki, Geçmiş)',
     person: 'Kişi (örn. ben, sen, o)',
     conjugatedForm: 'Çekimli form',

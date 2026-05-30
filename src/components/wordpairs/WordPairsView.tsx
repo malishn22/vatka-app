@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { useToggleSelection } from '../../hooks/useToggleSelection';
 import { useUIStore } from '../../store/uiStore';
@@ -12,6 +12,7 @@ import { AddWordPairForm } from './AddWordPairForm';
 import { VerbsView } from '../verbs/VerbsView';
 import { Button } from '../shared/Button';
 import { Toast } from '../shared/Toast';
+import { SearchBar } from '../shared/SearchBar';
 import { useT } from '../../i18n/useT';
 import { ExportModal } from './ExportModal';
 import { ImportModal } from './ImportModal';
@@ -19,8 +20,8 @@ import { PlayModeModal } from '../play/PlayModeModal';
 import type { GameMode } from '../../store/uiStore';
 
 export function WordPairsView() {
-  const { selectedSectionId, selectedSubsectionId, selectedLanguageId, setView, quizOptionCount, quizDirection, contentTab, setContentTab, conjugationMode, conjugationOptionCount } = useUIStore();
-  const { sections, languages, subsections, wordPairs, fetchWordPairs, verbs, fetchVerbs } = useDataStore();
+  const { selectedSectionId, selectedSubsectionId, selectedLanguageId, setView, setSelectedSection, setSelectedSubsection, quizOptionCount, quizDirection, contentTab, setContentTab, conjugationMode, conjugationOptionCount } = useUIStore();
+  const { sections, languages, subsections, wordPairs, fetchWordPairs, verbs, fetchVerbs, allLanguageWordPairs, allLanguageWordPairsLoadedFor, fetchWordPairsForLanguage } = useDataStore();
   const { initGame } = usePlayStore();
   const { initQuiz } = useQuizStore();
   const { initConjugationPlay } = useConjugationPlayStore();
@@ -31,6 +32,8 @@ export function WordPairsView() {
   const [exportFormat, setExportFormat] = useState<'xlsx' | 'csv' | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [playModalOpen, setPlayModalOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [searchGlobal, setSearchGlobal] = useState(false);
   const addFormRef = useRef<HTMLDivElement>(null);
 
   const { toggle: handleTogglePairSelect } = useToggleSelection(selectedPairIds, setSelectedPairIds);
@@ -49,9 +52,30 @@ export function WordPairsView() {
     }
   }, [selectedSectionId]);
 
-  const displayedPairs = selectedSubsectionId !== null
+  useEffect(() => {
+    setSearch('');
+    setSearchGlobal(false);
+  }, [selectedSectionId, selectedSubsectionId, selectedLanguageId, contentTab]);
+
+  useEffect(() => {
+    if (searchGlobal && selectedLanguageId !== null && allLanguageWordPairsLoadedFor !== selectedLanguageId) {
+      fetchWordPairsForLanguage(selectedLanguageId);
+    }
+  }, [searchGlobal, selectedLanguageId, allLanguageWordPairsLoadedFor]);
+
+  const query = search.trim().toLowerCase();
+  const sectionScopedPairs = selectedSubsectionId !== null
     ? wordPairs.filter((p) => p.subsection_id === selectedSubsectionId)
     : wordPairs;
+  const displayedPairs = useMemo(() => {
+    if (!query) return sectionScopedPairs;
+    const source = searchGlobal ? allLanguageWordPairs : sectionScopedPairs;
+    return source.filter(
+      (p) =>
+        p.source.toLowerCase().includes(query) ||
+        p.target.toLowerCase().includes(query)
+    );
+  }, [query, searchGlobal, allLanguageWordPairs, sectionScopedPairs]);
 
   const activePairs = displayedPairs.filter((p) => !p.disabled);
 
@@ -60,6 +84,8 @@ export function WordPairsView() {
     : verbs;
   const activeVerbs = displayedVerbs.filter((v) => !v.disabled);
   const activeConjugations = activeVerbs.flatMap((v) => v.conjugations);
+
+  const showGlobalColumns = query.length > 0 && searchGlobal;
 
   const canPlay = activePairs.length >= 2 || activeConjugations.length >= 2;
 
@@ -153,6 +179,15 @@ export function WordPairsView() {
 
       {contentTab === 'wordpairs' ? (
         <>
+          <div className="mb-4">
+            <SearchBar
+              value={search}
+              onChange={setSearch}
+              isGlobal={searchGlobal}
+              onGlobalChange={setSearchGlobal}
+            />
+          </div>
+
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -187,10 +222,10 @@ export function WordPairsView() {
                     <Button variant="secondary" onClick={() => setImportModalOpen(true)}>
                       {t.importExcel}
                     </Button>
-                    <Button variant="secondary" onClick={() => { setExportFormat('xlsx'); setAddFormOpen(false); }} disabled={wordPairs.length === 0}>
+                    <Button variant="secondary" onClick={() => { setExportFormat('xlsx'); setAddFormOpen(false); }}>
                       {t.exportExcel}
                     </Button>
-                    <Button variant="secondary" onClick={() => { setExportFormat('csv'); setAddFormOpen(false); }} disabled={wordPairs.length === 0}>
+                    <Button variant="secondary" onClick={() => { setExportFormat('csv'); setAddFormOpen(false); }}>
                       {t.exportCsv}
                     </Button>
                   </div>
@@ -201,7 +236,7 @@ export function WordPairsView() {
 
           {displayedPairs.length === 0 ? (
             <div className="text-center py-8 text-gray-400 dark:text-gray-500">
-              <p>{t.noWordPairsYet}</p>
+              <p>{query ? t.searchNoResults : t.noWordPairsYet}</p>
             </div>
           ) : (
             <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
@@ -214,7 +249,7 @@ export function WordPairsView() {
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                       {language?.target ?? t.target}
                     </th>
-                    {selectedSubsectionId === null && (
+                    {(selectedSubsectionId === null || showGlobalColumns) && (
                       <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                         {t.subsection}
                       </th>
@@ -223,16 +258,26 @@ export function WordPairsView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {displayedPairs.map((pair) => (
-                    <WordPairRow
-                      key={pair.id}
-                      pair={pair}
-                      showSection={selectedSubsectionId === null}
-                      subsections={subsections}
-                      isSelected={selectedPairIds.includes(pair.id)}
-                      onToggleSelect={(additive) => handleTogglePairSelect(pair.id, additive)}
-                    />
-                  ))}
+                  {displayedPairs.map((pair) => {
+                    const isExternal = showGlobalColumns && pair.section_id !== selectedSectionId;
+                    return (
+                      <WordPairRow
+                        key={pair.id}
+                        pair={pair}
+                        showSection={selectedSubsectionId === null || showGlobalColumns}
+                        subsections={subsections}
+                        sectionName={showGlobalColumns ? sections.find((s) => s.id === pair.section_id)?.name : undefined}
+                        isSelected={selectedPairIds.includes(pair.id)}
+                        onToggleSelect={(additive) => handleTogglePairSelect(pair.id, additive)}
+                        onRowClick={isExternal ? () => {
+                          setSelectedSection(pair.section_id);
+                          setSelectedSubsection(pair.subsection_id);
+                          setSearch('');
+                          setSearchGlobal(false);
+                        } : undefined}
+                      />
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

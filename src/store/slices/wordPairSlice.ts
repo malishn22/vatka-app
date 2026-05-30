@@ -5,7 +5,10 @@ import type { WordPair } from '../../types';
 
 export interface WordPairSlice {
   wordPairs: WordPair[];
+  allLanguageWordPairs: WordPair[];
+  allLanguageWordPairsLoadedFor: number | null;
   fetchWordPairs: (sectionId: number) => Promise<void>;
+  fetchWordPairsForLanguage: (languageId: number) => Promise<void>;
   addWordPair: (data: Omit<WordPair, 'id' | 'created_at'>) => Promise<void>;
   updateWordPair: (id: number, data: Partial<Omit<WordPair, 'id' | 'created_at'>>) => Promise<void>;
   deleteWordPair: (id: number) => Promise<void>;
@@ -14,6 +17,28 @@ export interface WordPairSlice {
 
 export const createWordPairSlice: StateCreator<any, [], [], WordPairSlice> = (set, get) => ({
   wordPairs: [],
+  allLanguageWordPairs: [],
+  allLanguageWordPairsLoadedFor: null,
+
+  fetchWordPairsForLanguage: async (languageId) => {
+    try {
+      const rows = await dbSelect<WordPair & { disabled: number | boolean }>(
+        `SELECT wp.* FROM word_pairs wp
+         JOIN sections s ON wp.section_id = s.id
+         WHERE s.language_id = ?
+         ORDER BY wp.id`,
+        [languageId]
+      );
+      const allLanguageWordPairs = rows.map((r) => ({
+        ...r,
+        disabled: toBool(r.disabled),
+        subsection_id: r.subsection_id ?? null,
+      }));
+      set({ allLanguageWordPairs, allLanguageWordPairsLoadedFor: languageId });
+    } catch (e) {
+      set({ error: String(e) });
+    }
+  },
 
   fetchWordPairs: async (sectionId) => {
     set({ isLoading: true, error: null });
@@ -34,6 +59,7 @@ export const createWordPairSlice: StateCreator<any, [], [], WordPairSlice> = (se
       'INSERT INTO word_pairs (section_id, subsection_id, source, target, disabled) VALUES (?, ?, ?, ?, ?)',
       [data.section_id, data.subsection_id ?? null, data.source, data.target, fromBool(data.disabled ?? false)]
     );
+    set({ allLanguageWordPairsLoadedFor: null });
     await get().fetchWordPairs(data.section_id);
   },
 
@@ -51,6 +77,7 @@ export const createWordPairSlice: StateCreator<any, [], [], WordPairSlice> = (se
         'UPDATE word_pairs SET source = ?, target = ?, disabled = ?, section_id = ?, subsection_id = ? WHERE id = ?',
         [data.source ?? pair.source, data.target ?? pair.target, disabled, newLevelId, newSubsectionId, id]
       );
+      set({ allLanguageWordPairsLoadedFor: null });
       await get().fetchWordPairs(newLevelId);
     } catch (e) {
       set({ error: String(e) });
@@ -63,6 +90,7 @@ export const createWordPairSlice: StateCreator<any, [], [], WordPairSlice> = (se
     await dbExecute('DELETE FROM word_pairs WHERE id = ?', [id]);
     set((state: any) => ({
       wordPairs: state.wordPairs.filter((p: WordPair) => p.id !== id),
+      allLanguageWordPairsLoadedFor: null,
     }));
   },
 

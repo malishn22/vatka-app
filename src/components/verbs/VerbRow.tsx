@@ -12,12 +12,14 @@ interface VerbRowProps {
   verb: VerbWithConjugations;
   onEdit: (verb: VerbWithConjugations) => void;
   showSection?: boolean;
+  sectionName?: string;
   subsectionName?: string;
   isSelected?: boolean;
   onToggleSelect?: (additive: boolean) => void;
+  onRowClick?: () => void;
 }
 
-export function VerbRow({ verb, onEdit, showSection, subsectionName, isSelected = false, onToggleSelect }: VerbRowProps) {
+export function VerbRow({ verb, onEdit, showSection, sectionName, subsectionName, isSelected = false, onToggleSelect, onRowClick }: VerbRowProps) {
   const { deleteVerb, toggleVerbDisabled } = useDataStore();
   const { draggingVerbIds, setDraggingVerbIds, selectedVerbIds, setSelectedVerbIds } = useDragContext();
   const t = useT();
@@ -55,6 +57,8 @@ export function VerbRow({ verb, onEdit, showSection, subsectionName, isSelected 
     if (e.metaKey || e.ctrlKey) {
       e.stopPropagation();
       onToggleSelect?.(true);
+    } else if (onRowClick) {
+      onRowClick();
     } else {
       setExpanded(!expanded);
     }
@@ -103,7 +107,8 @@ export function VerbRow({ verb, onEdit, showSection, subsectionName, isSelected 
           </span>
         </div>
         {showSection && (
-          <span className="flex-shrink-0">
+          <span className="flex-shrink-0 flex items-center gap-1.5">
+            {sectionName && <SectionBadge name={sectionName} />}
             <SectionBadge name={subsectionName} />
           </span>
         )}
